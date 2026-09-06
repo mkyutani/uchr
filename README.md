@@ -2,7 +2,7 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
-[![Unicode](https://img.shields.io/badge/Unicode-15.0-green.svg)](https://unicode.org/)
+[![Unicode](https://img.shields.io/badge/Unicode-multi--version-green.svg)](https://unicode.org/)
 [![PyPI version](https://badge.fury.io/py/uchr.svg)](https://badge.fury.io/py/uchr)
 [![PyPI downloads](https://img.shields.io/pypi/dm/uchr.svg)](https://pypi.org/project/uchr/)
 
@@ -48,15 +48,19 @@ poetry install
 
 ### Initialize database
 
-Create the Unicode database (required for first use):
+The database is created automatically on first use of `uchr search`, fetching
+the latest Unicode version. To fetch it explicitly instead:
 
 ```bash
-uchr db create
+uchr db update
 ```
 
-This downloads Unicode 15.0 data and creates a local SQLite database (~13MB) at:
+This downloads the latest Unicode data and creates a local SQLite database at:
 - Linux/macOS: `~/.local/share/uchr/unicode.db`
 - Root users: Automatically chooses between system (`/var/lib/uchr/`) or personal location
+
+Multiple Unicode versions can coexist in the same database — see
+[Database Management](#database-management) below.
 
 ## ⚡ Quick Start
 
@@ -160,6 +164,7 @@ Search Unicode characters with various criteria.
 | `--first` | `-1` | Show first result only |
 | `--format` | `-f` | Output format: `utf8`, `simple` |
 | `--delimiter` | `-D` | Custom delimiter (default: space) |
+| `--unicode-version` | | Search a specific Unicode version instead of the current one |
 
 #### uchr normalize
 
@@ -174,38 +179,71 @@ Unicode text normalization and conversion.
 
 #### uchr db
 
-Database management operations.
+Database management operations. Multiple Unicode versions can be stored in
+the database at once; `current_version` (set by `update`/`use`) is what
+`search` uses by default.
 
 | Subcommand | Description |
 |------------|-------------|
-| `uchr db create` | Create/update Unicode database |
-| `uchr db delete` | Remove Unicode database |
-| `uchr db info` | Show database location |
+| `uchr db update [--version X.Y.Z]` | Fetch a version (default: latest from unicode.org) and switch to it |
+| `uchr db use <version>` | Switch to a version already stored locally, without downloading |
+| `uchr db list` | List every version unicode.org currently publishes, marking which are stored locally, current, latest, or draft |
+| `uchr db delete <version>` | Delete one version's data |
+| `uchr db delete --all` | Delete the entire database file |
 
 ## 💾 Database Management
 
-### Create Database
+The database is created automatically the first time `uchr search` runs
+with no local database yet — it fetches the latest Unicode version. There's
+no separate "create" step to run manually.
+
+### Fetch a Version
+
 ```bash
-uchr db create
+# Fetch the latest version and make it current
+uchr db update
+
+# Fetch a specific version
+uchr db update --version 16.0.0
 ```
 
-### Check Database Location
+### Switch Between Locally Stored Versions
+
 ```bash
-uchr db info
+uchr db use 16.0.0
 ```
 
-### Remove Database
+### List Versions
+
 ```bash
-uchr db delete
+uchr db list
 ```
 
-### Environment Variables
+```
+15.0.0
+16.0.0 (local) [157667 rows]
+17.0.0 (current) (latest) [162626 rows]
+18.0.0 (draft)
+```
 
-- `UNICODE_DB_PATH`: Override default database location
+### Search a Specific Version Without Switching
 
 ```bash
-export UNICODE_DB_PATH="/custom/path/unicode.db"
-uchr db create
+uchr search ghost --unicode-version 16.0.0
+```
+
+If that version isn't stored locally yet, this errors and tells you to run
+`uchr db update --version 16.0.0` first — it won't silently download on a
+possibly-mistyped version number.
+
+### Remove Data
+
+```bash
+# Delete one version's data
+uchr db delete 16.0.0
+
+# Wipe the entire database file
+uchr db delete --all
 ```
 
 ## 🔤 Text Normalization
@@ -325,11 +363,11 @@ uchr search -b "Mathematical" | head -10
 
 ## 🏗 Data Sources
 
-This tool uses official Unicode 15.0 data:
-
-- [Unicode Character Database](https://www.unicode.org/Public/15.0.0/ucdxml/ucd.all.flat.zip)
-- [Emoji Sequences](https://www.unicode.org/Public/emoji/15.0/emoji-sequences.txt)
-- [Emoji ZWJ Sequences](https://www.unicode.org/Public/emoji/15.0/emoji-zwj-sequences.txt)
+This tool fetches official Unicode data directly from
+[unicode.org](https://www.unicode.org/Public/) — the Unicode Character
+Database (`ucdxml`) and Emoji Sequences for whichever version you request
+with `uchr db update`. By default it tracks the latest released version;
+run `uchr db list` to see everything currently published.
 
 ## 🏗 Development
 
@@ -400,7 +438,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 - **Current Version**: 0.3.0
 - **Python Support**: 3.8+
-- **Unicode Version**: 15.0
+- **Unicode Version**: tracks the latest released version by default; multiple versions can coexist locally (see `uchr db list`)
 - **Package Name**: `uchr` (on PyPI)
 - **Repository**: [mkyutani/uchr](https://github.com/mkyutani/uchr)
 

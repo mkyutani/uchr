@@ -6,10 +6,6 @@ from pathlib import Path
 
 def get_data_dir():
     """データディレクトリのパスを決定する"""
-    # 環境変数でオーバーライド可能
-    if "UNICODE_DB_PATH" in os.environ:
-        return Path(os.environ["UNICODE_DB_PATH"]).parent
-
     if os.getuid() == 0:  # rootユーザー
         # /procを使って親プロセスをチェック（Linuxのみ）
         try:
@@ -49,46 +45,99 @@ if not os.path.exists(unicode_sqlite3_database_dir):
             f"Permission denied: Cannot create directory {unicode_sqlite3_database_dir}",
             file=sys.stderr,
         )
-        print(
-            "Please create the directory manually or set UNICODE_DB_PATH environment variable",
-            file=sys.stderr,
-        )
+        print("Please create the directory manually", file=sys.stderr)
         sys.exit(1)
+
+
+LEGACY_VERSION = "15.0"
 
 
 class Database:
     def create(self):
-        def execute(conn, name, dml):
-            with Cursor(conn) as cur:
-                try:
-                    cur.execute(dml)
-                    conn.commit()
-                    print(f"Created table: {name}")
-                except Exception as e:
-                    t = type(e)
-                    s = str(e)
-                    if t == sqlite3.OperationalError and s.endswith(" already exists"):
-                        print(f"Table already exists: {name}", file=sys.stderr)
-                    else:
-                        print(f"Failed to create table: {name}", file=sys.stderr)
-                        print(f"{type(e).__name__}: {str(e)}", file=sys.stderr)
+        """Create tables if they don't exist yet, and migrate legacy schema.
 
+        Note: `CREATE TABLE IF NOT EXISTS` only applies its column
+        definitions when the table doesn't exist yet — it does NOT add
+        columns to an existing table. So a `char`/`codepoint` table from
+        before the `version` column existed needs an explicit
+        `ALTER TABLE ... ADD COLUMN` here, or `version` would silently
+        never get added and every version-aware query would fail.
+        """
         with Connection() as conn:
-            execute(
-                conn,
-                "char",
-                "create table char(id integer primary key, name text, detail text, codetext text, char text, block text)",
-            )
-            execute(
-                conn,
-                "codepoint",
-                "create table codepoint(char integer, seq integer, code integer, primary key(char, seq))",
-            )
-            execute(
-                conn, "char_index", "create unique index char_index on char(codetext)"
-            )
+            with Cursor(conn) as cur:
+                cur.execute(
+                    "create table if not exists char("
+                    "id integer primary key, name text, detail text, "
+                    "codetext text, char text, block text)"
+                )
+                # codepoint.char (= char.id) is globally unique across all
+                # versions (ids are assigned from a single running counter
+                # in database.py), so (char, seq) alone is already a valid
+                # primary key — no need to also key on version.
+                cur.execute(
+                    "create table if not exists codepoint("
+                    "char integer, seq integer, code integer, "
+                    "primary key(char, seq))"
+                )
+                cur.execute(
+                    "create table if not exists db_meta("
+                    "key text primary key, value text)"
+                )
+                conn.commit()
+                self._add_version_columns(cur, conn)
+                self._migrate_legacy_rows(cur, conn)
 
-    def delete(self):
+    def _add_version_columns(self, cur, conn):
+        # Only `char` needs `version` directly: `codepoint.char` (= char.id)
+        # is globally unique across versions, so codepoint rows already
+        # resolve to a version transitively via their `char` FK — no need
+        # to duplicate the version onto every codepoint row too.
+        cur.execute("pragma table_info(char)")
+        char_columns = {row[1] for row in cur.fetchall()}
+        if "version" not in char_columns:
+            cur.execute("alter table char add column version text")
+
+        cur.execute("drop index if exists char_index")
+        cur.execute(
+            "create unique index if not exists char_index " "on char(codetext, version)"
+        )
+        conn.commit()
+
+    def _migrate_legacy_rows(self, cur, conn):
+        """Backfill rows from before the `version` column existed."""
+        cur.execute("select count(*) from char where version is null")
+        (legacy_count,) = cur.fetchone()
+        if legacy_count == 0:
+            return
+
+        print(
+            f"Migrating {legacy_count} pre-versioning rows to version "
+            f"{LEGACY_VERSION} ...",
+            file=sys.stderr,
+        )
+        cur.execute(
+            "update char set version = ? where version is null", (LEGACY_VERSION,)
+        )
+        cur.execute(
+            "insert or ignore into db_meta(key, value) values('current_version', ?)",
+            (LEGACY_VERSION,),
+        )
+        conn.commit()
+
+    def delete_version(self, version):
+        with Connection() as conn:
+            with Cursor(conn) as cur:
+                cur.execute("delete from char where version = ?", (version,))
+                cur.execute("delete from codepoint where version = ?", (version,))
+                deleted = cur.rowcount
+                cur.execute("select value from db_meta where key = 'current_version'")
+                row = cur.fetchone()
+                if row and row[0] == version:
+                    cur.execute("delete from db_meta where key = 'current_version'")
+                conn.commit()
+        return deleted
+
+    def delete_all(self):
         if not os.path.exists(unicode_sqlite3_database_path):
             print(f"No database file: {unicode_sqlite3_database_path}", file=sys.stderr)
         else:
@@ -100,6 +149,36 @@ class Database:
 
     def get_path(self):
         return unicode_sqlite3_database_path
+
+    def exists(self):
+        return os.path.exists(unicode_sqlite3_database_path)
+
+    def local_versions(self):
+        """Return [(version, row_count)] for versions stored locally."""
+        with Connection() as conn:
+            with Cursor(conn) as cur:
+                cur.execute(
+                    "select version, count(*) from char "
+                    "where version is not null group by version"
+                )
+                return cur.fetchall()
+
+    def get_current_version(self):
+        with Connection() as conn:
+            with Cursor(conn) as cur:
+                cur.execute("select value from db_meta where key = 'current_version'")
+                row = cur.fetchone()
+                return row[0] if row else None
+
+    def set_current_version(self, version):
+        with Connection() as conn:
+            with Cursor(conn) as cur:
+                cur.execute(
+                    "insert into db_meta(key, value) values('current_version', ?) "
+                    "on conflict(key) do update set value = excluded.value",
+                    (version,),
+                )
+                conn.commit()
 
 
 class Connection:

@@ -17,7 +17,9 @@ def get_code_range(fragment):
     return r
 
 
-def search(fragment, by, delimiter, strict=False, first=False, format=None):
+def search(
+    fragment, by, delimiter, strict=False, first=False, format=None, version=None
+):
     if format is not None:
         format = format.upper()
 
@@ -32,31 +34,41 @@ def search(fragment, by, delimiter, strict=False, first=False, format=None):
                     [
                         head,
                         "inner join codepoint as cp on char.id = cp.char",
-                        "where cp.code >= ? and cp.code <= ?",
+                        "where cp.code >= ? and cp.code <= ? and char.version = ?",
                         "order by char.char",
                     ]
                 )
-                params = (code_range[0], code_range[1])
+                params = (code_range[0], code_range[1], version)
             else:
                 dml = " ".join(
                     [
                         head,
                         "inner join codepoint as cp on char.id = cp.char",
-                        "where cp.code = ?",
+                        "where cp.code = ? and char.version = ?",
                         "order by char.char",
                     ]
                 )
-                params = (code_range,)
+                params = (code_range, version)
         elif by == "char":
-            dml = " ".join([head, "where char.char = ?"])
-            params = (fragment,)
+            dml = " ".join([head, "where char.char = ? and char.version = ?"])
+            params = (fragment, version)
         else:
             column = f"upper({by})" if strict else by
             value = fragment.upper() if strict else f"%{fragment}%"
             operator = "=" if strict else "like"
             table = head_detail if by == "detail" else head
-            dml = " ".join([table, "where", column, operator, "?", "order by char.char"])
-            params = (value,)
+            dml = " ".join(
+                [
+                    table,
+                    "where",
+                    column,
+                    operator,
+                    "?",
+                    "and char.version = ?",
+                    "order by char.char",
+                ]
+            )
+            params = (value, version)
 
         with Cursor(conn) as cur:
             cur.execute(dml, params)
