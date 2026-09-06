@@ -22,16 +22,16 @@ def get_data_dir():
 
             if parent_name in ["systemd", "cron"]:
                 # システムサービスとして実行されている
-                return Path("/var/lib/unicode-tools")
+                return Path("/var/lib/uchr")
         except (FileNotFoundError, ValueError, IndexError):
             # /procが読めない場合やLinux以外の場合
             pass
 
         # rootの個人利用
-        return Path("/root/.local/share/unicode-tools")
+        return Path("/root/.local/share/uchr")
     else:
         # 通常ユーザー
-        return Path.home() / ".local/share/unicode-tools"
+        return Path.home() / ".local/share/uchr"
 
 
 # データベースパスの設定
