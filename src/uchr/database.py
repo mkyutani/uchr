@@ -1,19 +1,16 @@
 #!/usr/bin/env python3
 
 import io
-import os
 import re
 import sqlite3
 import sys
-import tempfile
 import xml.etree.ElementTree as et
-import zipfile
 from pathlib import Path
 from urllib.parse import urlparse
 
-import requests
-
 from .db import AutoID, Connection, Cursor, Database
+from .errors import DownloadError
+from .http_utils import download_text_file, download_zip_file
 
 namespace = "{http://www.unicode.org/ns/2003/ucd/1.0}"
 tag_ucd = namespace + "ucd"
@@ -30,48 +27,15 @@ table_char_autoincrement_id = AutoID().init()
 
 def download_ucd(ucd_zip_url):
     ucd_zip_url_path = Path(urlparse(ucd_zip_url)[2])
-    ucd_zip_filename = ucd_zip_url_path.name
     ucd_xml_filename = ucd_zip_url_path.with_suffix(".xml").name
 
-    zip_filepath = "(Not assigned)"
-
+    print(f"Downloading {ucd_zip_url} ...", file=sys.stderr)
     try:
-        with tempfile.TemporaryDirectory() as tmpdir:
-            zip_filepath = os.path.join(tmpdir, ucd_zip_filename)
-
-            print(f"Downloading {ucd_zip_url} ...", file=sys.stderr)
-
-            res = requests.get(ucd_zip_url, stream=True)
-            if res.status_code >= 400:
-                print(f"Fetch error: {res.status_code}", file=sys.stderr)
-                return None
-
-            content_type = res.headers["Content-Type"]
-            if content_type != "application/zip":
-                print(f"Invalid content type: {content_type}")
-                return None
-
-            with open(zip_filepath, "wb") as fzip:
-                for chunk in res.iter_content(chunk_size=1024):
-                    if chunk:
-                        fzip.write(chunk)
-                        fzip.flush()
-
-            print(f"Downloaded {zip_filepath}", file=sys.stderr)
-
-            with zipfile.ZipFile(zip_filepath, "r") as zip:
-                xml_list = zip.read(ucd_xml_filename)
-
-            print("Extracted unicode data xml", file=sys.stderr)
-
-            return xml_list
-
-    except Exception as e:
-        print(
-            f"Failed to download zip from {ucd_zip_url} to {zip_filepath}",
-            file=sys.stderr,
-        )
-        print(f"{type(e).__name__}: {str(e)}", file=sys.stderr)
+        xml_list = download_zip_file(ucd_zip_url, ucd_xml_filename)
+        print("Extracted unicode data xml", file=sys.stderr)
+        return xml_list
+    except DownloadError as e:
+        print(f"Failed to download UCD: {e}", file=sys.stderr)
         return None
 
 
@@ -200,21 +164,9 @@ def store_ucd(xml_list):
 
 def download_emoji(emoji_txt_url):
     try:
-        res = requests.get(emoji_txt_url)
-        if res.status_code >= 400:
-            print(f"Fetch error: {res.status_code}", file=sys.stderr)
-            return None
-
-        content_type = res.headers["Content-Type"]
-        if not ("text/plain" in content_type and "charset=utf-8" in content_type):
-            print(f"Invalid content type: {content_type}")
-            return None
-
-        return res.text.splitlines()
-
-    except Exception as e:
-        print(f"Failed to download emoji from {emoji_txt_url}", file=sys.stderr)
-        print(f"{type(e).__name__}: {str(e)}", file=sys.stderr)
+        return download_text_file(emoji_txt_url, "text/plain")
+    except DownloadError as e:
+        print(f"Failed to download emoji: {e}", file=sys.stderr)
         return None
 
 
