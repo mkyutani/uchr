@@ -28,37 +28,38 @@ def search(fragment, by, delimiter, strict=False, first=False, format=None):
         if by == "code":
             code_range = get_code_range(fragment)
             if type(code_range) is tuple:
-                cond = (
-                    f"where cp.code >= {code_range[0]} and cp.code <= {code_range[1]}"
-                )
-            else:
-                cond = f"where cp.code = {code_range}"
-            dml = " ".join(
-                [
-                    head,
-                    "inner join codepoint as cp on char.id = cp.char",
-                    cond,
-                    "order by char.char",
-                ]
-            )
-        elif by == "char":
-            cond = f'where char.char = "{fragment}"'
-            dml = " ".join([head, cond])
-        else:
-            if strict:
-                by = f"upper({by})"
-                matched = f'= "{fragment.upper()}"'
-            else:
-                matched = f'like "%{fragment}%"'
-            if by == "detail":
                 dml = " ".join(
-                    [head_detail, "where", by, matched, "order by char.char"]
+                    [
+                        head,
+                        "inner join codepoint as cp on char.id = cp.char",
+                        "where cp.code >= ? and cp.code <= ?",
+                        "order by char.char",
+                    ]
                 )
+                params = (code_range[0], code_range[1])
             else:
-                dml = " ".join([head, "where", by, matched, "order by char.char"])
+                dml = " ".join(
+                    [
+                        head,
+                        "inner join codepoint as cp on char.id = cp.char",
+                        "where cp.code = ?",
+                        "order by char.char",
+                    ]
+                )
+                params = (code_range,)
+        elif by == "char":
+            dml = " ".join([head, "where char.char = ?"])
+            params = (fragment,)
+        else:
+            column = f"upper({by})" if strict else by
+            value = fragment.upper() if strict else f"%{fragment}%"
+            operator = "=" if strict else "like"
+            table = head_detail if by == "detail" else head
+            dml = " ".join([table, "where", column, operator, "?", "order by char.char"])
+            params = (value,)
 
         with Cursor(conn) as cur:
-            cur.execute(dml)
+            cur.execute(dml, params)
             char_list = cur.fetchall()
 
         if first == True:

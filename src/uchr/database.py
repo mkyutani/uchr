@@ -165,21 +165,15 @@ def store_ucd(xml_list):
                 code_range = get_ucd_char_cp(char)
                 for code in code_range:
                     value_code = code
-                    value_code_text = f'"{value_code:X}"'
+                    value_code_text = f"{value_code:X}"
                     name = get_name(char)
                     if not name:
                         print(f"Found no character: {code:X}", file=sys.stderr)
                         continue
-                    value_name = f'"{name}"'
                     detail = get_detail(char, name)
-                    value_detail = f'"{detail}"'
 
                     try:
-                        if code == 0:
-                            value_char = "NULL"
-                        else:
-                            escaped_char = str(chr(code)).replace('"', '""')
-                            value_char = f'"{escaped_char}"'
+                        value_char = None if code == 0 else str(chr(code))
                     except ValueError:
                         print(f"Invalid character {code:X} ({name})", file=sys.stderr)
                         continue
@@ -187,15 +181,17 @@ def store_ucd(xml_list):
                     block = char.attrib.get("blk")
                     if not block:
                         print(f"No block name: {code:X}", file=sys.stderr)
-                        value_block = '"(None)"'
-                    else:
-                        value_block = f'"{block}"'
+                        block = "(None)"
 
                     id = table_char_autoincrement_id.next()
-                    dml = f"insert into char(id, name, detail, codetext, char, block) values({id}, {value_name}, {value_detail}, {value_code_text}, {value_char}, {value_block})"
-                    cur.execute(dml)
-                    dml_seq = f"insert into codepoint(char, seq, code) values({id}, 1, {value_code})"
-                    cur.execute(dml_seq)
+                    cur.execute(
+                        "insert into char(id, name, detail, codetext, char, block) values(?, ?, ?, ?, ?, ?)",
+                        (id, name, detail, value_code_text, value_char, block),
+                    )
+                    cur.execute(
+                        "insert into codepoint(char, seq, code) values(?, ?, ?)",
+                        (id, 1, value_code),
+                    )
                     count = count + 1
 
             conn.commit()
@@ -266,35 +262,35 @@ def store_emoji(emoji_sequences):
                     )
                     continue
 
-                value_name = f'"{emoji_name}"'
-                value_code_text = f'"{emoji_codes}"'
-                value_block = f'"{emoji_type}"'
                 for code in cp_list:
                     if type(code) is int:
-                        value_code_text = f'"{code:X}"'
-                        char = chr(code)
-                        value_char = f'"{char}"'
+                        value_code_text = f"{code:X}"
+                        value_char = chr(code)
                     else:
-                        char = ""
-                        for c in code:
-                            char = char + chr(c)
-                        value_char = f'"{char}"'
+                        value_code_text = emoji_codes
+                        value_char = "".join(chr(c) for c in code)
 
                     try:
                         id = table_char_autoincrement_id.next()
-                        dml = f"insert into char(id, name, codetext, char, block) values({id}, {value_name}, {value_code_text}, {value_char}, {value_block})"
-                        cur.execute(dml)
+                        cur.execute(
+                            "insert into char(id, name, codetext, char, block) values(?, ?, ?, ?, ?)",
+                            (id, emoji_name, value_code_text, value_char, emoji_type),
+                        )
                         if type(code) is int:
-                            dml_seq = f"insert into codepoint(char, seq, code) values({id}, 1, {code})"
-                            cur.execute(dml_seq)
+                            cur.execute(
+                                "insert into codepoint(char, seq, code) values(?, ?, ?)",
+                                (id, 1, code),
+                            )
                         else:
                             for i, c in enumerate(code):
-                                dml_seq = f"insert into codepoint(char, seq, code) values({id}, {i}, {c})"
-                                cur.execute(dml_seq)
+                                cur.execute(
+                                    "insert into codepoint(char, seq, code) values(?, ?, ?)",
+                                    (id, i, c),
+                                )
                         count = count + 1
                     except sqlite3.IntegrityError:
                         print(
-                            f"Already registered: {value_code_text} {value_name}",
+                            f"Already registered: {value_code_text} {emoji_name}",
                             file=sys.stderr,
                         )
 
