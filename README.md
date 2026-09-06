@@ -41,8 +41,8 @@ pip install uchr
 ### Install from source
 
 ```bash
-git clone https://github.com/mkyutani/unicode-tools.git
-cd unicode-tools
+git clone https://github.com/mkyutani/uchr.git
+cd uchr
 poetry install
 ```
 
@@ -339,8 +339,8 @@ This project uses [Poetry](https://python-poetry.org/) for dependency management
 
 ```bash
 # Clone the repository
-git clone https://github.com/mkyutani/unicode-tools.git
-cd unicode-tools
+git clone https://github.com/mkyutani/uchr.git
+cd uchr
 
 # Install dependencies
 poetry install
@@ -402,6 +402,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Python Support**: 3.8+
 - **Unicode Version**: 15.0
 - **Package Name**: `uchr` (on PyPI)
-- **Repository**: [mkyutani/unicode-tools](https://github.com/mkyutani/unicode-tools)
+- **Repository**: [mkyutani/uchr](https://github.com/mkyutani/uchr)
 
-For the latest updates and roadmap, see our [GitHub Issues](https://github.com/mkyutani/unicode-tools/issues).
+For the latest updates and roadmap, see our [GitHub Issues](https://github.com/mkyutani/uchr/issues).

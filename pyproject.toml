@@ -5,8 +5,8 @@ description = "Unicode character tools"
 authors = ["Miki Yutani <mkyutani@gmail.com>"]
 license = "MIT"
 readme = "README.md"
-homepage = "https://github.com/mkyutani/unicode-tools"
-repository = "https://github.com/mkyutani/unicode-tools"
+homepage = "https://github.com/mkyutani/uchr"
+repository = "https://github.com/mkyutani/uchr"
 keywords = ["unicode", "character", "tools", "cli"]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -24,7 +24,7 @@ classifiers = [
     "Topic :: Text Processing :: General",
     "Topic :: Utilities",
 ]
-packages = [{include = "unicode_tools", from = "src"}]
+packages = [{include = "uchr", from = "src"}]
 
 [tool.poetry.dependencies]
 python = "^3.8"
@@ -36,7 +36,7 @@ black = "^23.0.0"
 ruff = "^0.1.0"
 
 [tool.poetry.scripts]
-uchr = "unicode_tools.uchr:uchr"
+uchr = "uchr.uchr:uchr"
 
 [build-system]
 requires = ["poetry-core"]
