@@ -476,7 +476,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📊 Project Status
 
-- **Current Version**: 0.3.0
+- **Current Version**: 0.4.0
 - **Python Support**: 3.8+
 - **Unicode Version**: tracks the latest released version by default; multiple versions can coexist locally (see `uchr db list`)
 - **Package Name**: `uchr` (on PyPI)
