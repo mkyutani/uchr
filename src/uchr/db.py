@@ -127,8 +127,14 @@ class Database:
     def delete_version(self, version):
         with Connection() as conn:
             with Cursor(conn) as cur:
+                # codepoint has no version column; it resolves to a version
+                # via its char FK, so delete it before the char rows go away.
+                cur.execute(
+                    "delete from codepoint where char in "
+                    "(select id from char where version = ?)",
+                    (version,),
+                )
                 cur.execute("delete from char where version = ?", (version,))
-                cur.execute("delete from codepoint where version = ?", (version,))
                 deleted = cur.rowcount
                 cur.execute("select value from db_meta where key = 'current_version'")
                 row = cur.fetchone()
