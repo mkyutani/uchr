@@ -13,13 +13,17 @@ from typing import List, Optional, Tuple
 import requests
 
 from .errors import DownloadError
+from .http_utils import HTTP_TIMEOUT
 
-UCD_LATEST_URL = "https://www.unicode.org/Public/UCD/latest/ucdxml/ucd.all.flat.zip"
 PUBLIC_LATEST_URL = "https://www.unicode.org/Public/latest/ucdxml/ucd.all.flat.zip"
 PUBLIC_INDEX_URL = "https://www.unicode.org/Public/"
 
 _VERSION_IN_URL = re.compile(r"/Public/(\d+\.\d+\.\d+)/")
 _VERSION_DIR = re.compile(r'href="(\d+\.\d+\.\d+)/"')
+
+
+def version_key(version: str) -> Tuple[int, ...]:
+    return tuple(int(p) for p in version.split("."))
 
 
 def ucd_zip_url(version: str) -> str:
@@ -33,11 +37,13 @@ def resolve_latest_version() -> Tuple[str, str]:
     can't be determined from the response.
     """
     try:
-        res = requests.get(PUBLIC_LATEST_URL, stream=True)
+        res = requests.get(PUBLIC_LATEST_URL, stream=True, timeout=HTTP_TIMEOUT)
         res.close()
     except Exception as e:
         raise DownloadError(f"Failed to resolve latest version: {e}") from e
 
+    if res.status_code != 200:
+        raise DownloadError(f"HTTP error {res.status_code}: {PUBLIC_LATEST_URL}")
     m = _VERSION_IN_URL.search(res.url)
     if not m:
         raise DownloadError(f"Could not determine version from {res.url}")
@@ -51,13 +57,13 @@ def is_draft_url(url: str) -> bool:
 def list_published_versions() -> List[str]:
     """Scrape unicode.org/Public/ for all published Unicode versions (X.Y.Z)."""
     try:
-        res = requests.get(PUBLIC_INDEX_URL)
+        res = requests.get(PUBLIC_INDEX_URL, timeout=HTTP_TIMEOUT)
         res.raise_for_status()
     except Exception as e:
         raise DownloadError(f"Failed to list published versions: {e}") from e
 
     versions = _VERSION_DIR.findall(res.text)
-    return sorted(set(versions), key=lambda v: tuple(int(p) for p in v.split(".")))
+    return sorted(set(versions), key=version_key)
 
 
 def check_version_status(version: str) -> Optional[str]:
@@ -68,7 +74,7 @@ def check_version_status(version: str) -> Optional[str]:
     fetched at all.
     """
     try:
-        res = requests.get(ucd_zip_url(version), stream=True)
+        res = requests.get(ucd_zip_url(version), stream=True, timeout=HTTP_TIMEOUT)
         res.close()
     except Exception:
         return None
@@ -96,3 +102,31 @@ def emoji_urls(version: str) -> List[str]:
         (f"{new_layout}/emoji-sequences.txt", f"{new_layout}/emoji-zwj-sequences.txt"),
         (f"{old_layout}/emoji-sequences.txt", f"{old_layout}/emoji-zwj-sequences.txt"),
     ]
+
+
+def _get_lines(url: str) -> Optional[List[str]]:
+    """GET a text file; None if it doesn't exist (404), DownloadError on any
+    other failure so a network problem isn't mistaken for "no such file"."""
+    try:
+        res = requests.get(url, timeout=HTTP_TIMEOUT)
+    except Exception as e:
+        raise DownloadError(f"Failed to download {url}: {e}") from e
+    if res.status_code == 404:
+        return None
+    if res.status_code != 200:
+        raise DownloadError(f"HTTP error {res.status_code}: {url}")
+    return res.text.splitlines()
+
+
+def download_emoji_pair(
+    version: str,
+) -> Tuple[Optional[List[str]], Optional[List[str]]]:
+    """Return the lines of (emoji-sequences, emoji-zwj-sequences) for a
+    version, probing each candidate layout from emoji_urls() in order.
+    (None, None) means no candidate exists, e.g. versions before emoji data
+    was published; zwj is None when only the sequences file exists."""
+    for sequences_url, zwj_url in emoji_urls(version):
+        sequences = _get_lines(sequences_url)
+        if sequences is not None:
+            return sequences, _get_lines(zwj_url)
+    return None, None

@@ -59,6 +59,10 @@ This downloads the latest Unicode data and creates a local SQLite database at:
 - Linux/macOS: `~/.local/share/uchr/unicode.db`
 - Root users: Automatically chooses between system (`/var/lib/uchr/`) or personal location
 
+The database file is created with mode `0644`: anyone who can reach it can
+search it, but only its owner can change it (`db update`/`use`/`delete`).
+For the system location this means root.
+
 Multiple Unicode versions can coexist in the same database — see
 [Database Management](#database-management) below.
 
@@ -76,9 +80,6 @@ uchr search -x 👻
 
 # Search within a Unicode block
 uchr search -b "Emoticons"
-
-# Normalize text
-echo "ＨｅｌｌｏＷｏｒｌｄ" | uchr normalize --halfwidth
 ```
 
 ## 📋 Usage Examples
@@ -166,9 +167,10 @@ Search Unicode characters with various criteria.
 | `--delimiter` | `-D` | Custom delimiter (default: space) |
 | `--unicode-version` | | Search a specific Unicode version instead of the current one |
 
-#### uchr normalize
+#### uchr normalize (deprecated)
 
-Unicode text normalization and conversion.
+Unicode text normalization and conversion. Deprecated — see
+[Text Normalization](#text-normalization).
 
 | Option | Short | Description |
 |--------|-------|-------------|
@@ -207,6 +209,10 @@ uchr db update
 uchr db update --version 16.0.0
 ```
 
+A version that is already stored is not downloaded again; `update` just makes
+it current. The exception is a version stored as unreleased draft data, which
+is fetched again so it picks up changes (or the final release).
+
 ### Switch Between Locally Stored Versions
 
 ```bash
@@ -221,8 +227,8 @@ uchr db list
 
 ```
 15.0.0
-16.0.0 (local) [157667 rows]
-17.0.0 (current) (latest) [162626 rows]
+16.0.0 (local) [157667 chars]
+17.0.0 (current) (latest) [162626 chars]
 18.0.0 (draft)
 ```
 
@@ -247,6 +253,11 @@ uchr db delete --all
 ```
 
 ## 🔤 Text Normalization
+
+> **Deprecated:** `uchr normalize` will be removed in a future release. It
+> uses the Unicode data built into Python (`unicodedata.unidata_version`, e.g.
+> 15.0.0 on Python 3.12), not the uchr database, so it ignores
+> `uchr db` versions. It prints a warning to stderr when used.
 
 The `uchr normalize` command provides Unicode text normalization and conversion utilities.
 

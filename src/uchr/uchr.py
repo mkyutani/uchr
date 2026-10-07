@@ -30,7 +30,7 @@ def search_command(args):
     by = args.by if args.by else "name"
 
     if (by == "code" or by == "char") and args.strict:
-        print(f"warning: Ignore --strict in {by} search")
+        print(f"warning: Ignore --strict in {by} search", file=sys.stderr)
 
     search(
         args.expression,
@@ -45,7 +45,18 @@ def search_command(args):
 
 def normalize_command(args):
     """Handle uchr normalize subcommand"""
+    import unicodedata
+
     from .normalize import normalize_command as normalize_func
+
+    # normalize uses Python's built-in unicodedata, not the uchr DB, so it
+    # cannot follow `uchr db` versions; it is kept only for compatibility.
+    print(
+        "warning: 'uchr normalize' is deprecated and will be removed in a "
+        "future release. It uses the Unicode data built into Python "
+        f"(Unicode {unicodedata.unidata_version}), not the uchr database.",
+        file=sys.stderr,
+    )
 
     return normalize_func(
         form=args.form,
@@ -101,11 +112,6 @@ Examples:
   uchr search -x 👻                   # Search by character
   uchr search -b "Emoticons"          # Search by Unicode block
   uchr search ghost --unicode-version 16.0.0  # Search a specific version
-  uchr normalize                      # Normalize text from stdin (NFC)
-  uchr normalize --form nfd           # Normalize to NFD form
-  uchr normalize --halfwidth          # Convert fullwidth to halfwidth
-  uchr normalize --detail             # Show result form binary unicode
-  uchr normalize --compare            # Show all normalization forms
   uchr db update                      # Fetch latest Unicode data
   uchr db update --version 16.0.0     # Fetch a specific version
   uchr db use 16.0.0                  # Switch current version
@@ -181,7 +187,8 @@ Examples:
 
     # Normalize subcommand
     normalize_parser = subparsers.add_parser(
-        "normalize", help="Normalize and convert Unicode text"
+        "normalize",
+        help="(deprecated) Normalize and convert Unicode text",
     )
     normalize_parser.add_argument(
         "input_file", nargs="?", default=None, help="Input file (default: stdin)"
