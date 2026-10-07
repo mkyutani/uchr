@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "uchr"
-version = "0.4.0"
+version = "1.0.0"
 description = "Unicode character tools"
 authors = ["Miki Yutani <mkyutani@gmail.com>"]
 license = "MIT"
@@ -9,7 +9,7 @@ homepage = "https://github.com/mkyutani/uchr"
 repository = "https://github.com/mkyutani/uchr"
 keywords = ["unicode", "character", "tools", "cli"]
 classifiers = [
-    "Development Status :: 4 - Beta",
+    "Development Status :: 5 - Production/Stable",
     "Environment :: Console",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
