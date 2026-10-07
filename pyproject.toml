@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "uchr"
-version = "0.3.0"
+version = "0.4.0"
 description = "Unicode character tools"
 authors = ["Miki Yutani <mkyutani@gmail.com>"]
 license = "MIT"

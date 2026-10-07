@@ -404,15 +404,44 @@ poetry run black src/
 poetry run ruff check src/
 ```
 
-### Building and Publishing
+### Building
 
 ```bash
-# Build package
 poetry build
-
-# Publish to PyPI (maintainers only)
-poetry publish
 ```
+
+### Releasing
+
+Releases are published by GitHub Actions (`.github/workflows/release.yml`).
+Bump `version` in `pyproject.toml`, merge it to `main`, then push a matching
+tag:
+
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The tag must equal `v` + the `pyproject.toml` version, or the build fails.
+The workflow then runs the tests, builds the sdist and wheel, publishes them to
+[TestPyPI](https://test.pypi.org/project/uchr/), installs the release back
+from TestPyPI as a smoke test, waits for approval on the `pypi` environment,
+publishes to [PyPI](https://pypi.org/project/uchr/), and creates a GitHub
+Release with the built files attached.
+
+Uploads use [Trusted Publishing](https://docs.pypi.org/trusted-publishers/),
+so no API tokens are stored in the repository. One-time setup:
+
+1. **PyPI**: in the `uchr` project's *Publishing* settings, add a GitHub
+   publisher — owner `mkyutani`, repository `uchr`, workflow `release.yml`,
+   environment `pypi`.
+2. **TestPyPI**: add the same publisher with environment `testpypi` (as a
+   *pending publisher* if the project does not exist there yet).
+3. **GitHub**: create the environments `testpypi` and `pypi` under
+   *Settings → Environments*. Give `pypi` a required reviewer so the
+   production upload waits for approval, and restrict both to `v*` tags.
+
+Tests also run on every pull request and push to `main`
+(`.github/workflows/ci.yml`).
 
 ## 🤝 Contributing
 
@@ -447,7 +476,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 📊 Project Status
 
-- **Current Version**: 0.3.0
+- **Current Version**: 0.4.0
 - **Python Support**: 3.8+
 - **Unicode Version**: tracks the latest released version by default; multiple versions can coexist locally (see `uchr db list`)
 - **Package Name**: `uchr` (on PyPI)
