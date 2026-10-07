@@ -18,13 +18,19 @@ def wrap_io():
 
 def search_command(args):
     """Handle uchr search subcommand"""
+    from .database import resolve_search_version
     from .search import search
+
+    version, error = resolve_search_version(args.unicode_version)
+    if error:
+        print(error, file=sys.stderr)
+        return 1
 
     # Convert args to match search.search signature
     by = args.by if args.by else "name"
 
     if (by == "code" or by == "char") and args.strict:
-        print(f"warning: Ignore --strict in {by} search")
+        print(f"warning: Ignore --strict in {by} search", file=sys.stderr)
 
     search(
         args.expression,
@@ -33,12 +39,24 @@ def search_command(args):
         strict=args.strict,
         first=args.first,
         format=args.format,
+        version=version,
     )
 
 
 def normalize_command(args):
     """Handle uchr normalize subcommand"""
+    import unicodedata
+
     from .normalize import normalize_command as normalize_func
+
+    # normalize uses Python's built-in unicodedata, not the uchr DB, so it
+    # cannot follow `uchr db` versions; it is kept only for compatibility.
+    print(
+        "warning: 'uchr normalize' is deprecated and will be removed in a "
+        "future release. It uses the Unicode data built into Python "
+        f"(Unicode {unicodedata.unidata_version}), not the uchr database.",
+        file=sys.stderr,
+    )
 
     return normalize_func(
         form=args.form,
@@ -50,25 +68,35 @@ def normalize_command(args):
     )
 
 
-def db_create_command(args):
-    """Handle uchr db create subcommand"""
-    from .database import create_database
+def db_update_command(args):
+    """Handle uchr db update subcommand"""
+    from .database import update_database
 
-    return create_database()
+    return update_database(version=args.version)
+
+
+def db_use_command(args):
+    """Handle uchr db use subcommand"""
+    from .database import use_version
+
+    return use_version(args.version)
+
+
+def db_list_command(args):
+    """Handle uchr db list subcommand"""
+    from .database import list_versions
+
+    return list_versions()
 
 
 def db_delete_command(args):
     """Handle uchr db delete subcommand"""
-    from .database import delete_database
+    from .database import delete_version
 
-    return delete_database()
-
-
-def db_info_command(args):
-    """Handle uchr db info subcommand"""
-    from .database import database_info
-
-    return database_info()
+    if not args.version and not args.all:
+        print("Error: specify a version or --all", file=sys.stderr)
+        return 1
+    return delete_version(version=args.version, delete_all=args.all)
 
 
 def create_parser():
@@ -83,13 +111,12 @@ Examples:
   uchr search -c 1F47A-1F480          # Search by code range
   uchr search -x 👻                   # Search by character
   uchr search -b "Emoticons"          # Search by Unicode block
-  uchr normalize                      # Normalize text from stdin (NFC)
-  uchr normalize --form nfd           # Normalize to NFD form
-  uchr normalize --halfwidth          # Convert fullwidth to halfwidth
-  uchr normalize --detail             # Show result form binary unicode
-  uchr normalize --compare            # Show all normalization forms
-  uchr db create                      # Create Unicode database
-  uchr db info                        # Show database location
+  uchr search ghost --unicode-version 16.0.0  # Search a specific version
+  uchr db update                      # Fetch latest Unicode data
+  uchr db update --version 16.0.0     # Fetch a specific version
+  uchr db use 16.0.0                  # Switch current version
+  uchr db list                        # List available/local versions
+  uchr db delete 16.0.0               # Delete one version's data
         """,
     )
 
@@ -150,11 +177,18 @@ Examples:
     search_parser.add_argument(
         "-D", "--delimiter", default=" ", help="Output delimiter (default: space)"
     )
+    search_parser.add_argument(
+        "--unicode-version",
+        default=None,
+        metavar="X.Y.Z",
+        help="Search a specific Unicode version instead of the current one",
+    )
     search_parser.set_defaults(func=search_command)
 
     # Normalize subcommand
     normalize_parser = subparsers.add_parser(
-        "normalize", help="Normalize and convert Unicode text"
+        "normalize",
+        help="(deprecated) Normalize and convert Unicode text",
     )
     normalize_parser.add_argument(
         "input_file", nargs="?", default=None, help="Input file (default: stdin)"
@@ -193,21 +227,42 @@ Examples:
         dest="db_command", help="Database operations"
     )
 
-    # db create
-    db_create_parser = db_subparsers.add_parser(
-        "create", help="Create Unicode database"
+    # db update
+    db_update_parser = db_subparsers.add_parser(
+        "update", help="Fetch a Unicode version and set it as current"
     )
-    db_create_parser.set_defaults(func=db_create_command)
+    db_update_parser.add_argument(
+        "--version",
+        default=None,
+        metavar="X.Y.Z",
+        help="Version to fetch (default: resolve latest from unicode.org)",
+    )
+    db_update_parser.set_defaults(func=db_update_command)
+
+    # db use
+    db_use_parser = db_subparsers.add_parser(
+        "use", help="Switch current version to one already stored locally"
+    )
+    db_use_parser.add_argument("version", metavar="X.Y.Z", help="Version to switch to")
+    db_use_parser.set_defaults(func=db_use_command)
+
+    # db list
+    db_list_parser = db_subparsers.add_parser(
+        "list", help="List published and locally stored Unicode versions"
+    )
+    db_list_parser.set_defaults(func=db_list_command)
 
     # db delete
     db_delete_parser = db_subparsers.add_parser(
-        "delete", help="Delete Unicode database"
+        "delete", help="Delete one version's data, or all data"
+    )
+    db_delete_parser.add_argument(
+        "version", metavar="X.Y.Z", nargs="?", default=None, help="Version to delete"
+    )
+    db_delete_parser.add_argument(
+        "--all", action="store_true", help="Delete the entire database file"
     )
     db_delete_parser.set_defaults(func=db_delete_command)
-
-    # db info
-    db_info_parser = db_subparsers.add_parser("info", help="Show database information")
-    db_info_parser.set_defaults(func=db_info_command)
 
     return parser
 
