@@ -16,19 +16,22 @@ A powerful command-line tool for searching and exploring Unicode characters, emo
 - **Search by block**: Explore characters within Unicode blocks
 - **Emoji support**: Full support for emoji sequences and ZWJ sequences
 - **CJK details**: Enhanced descriptions for CJK characters using kDefinition
+- **Multiple Unicode versions**: Fetch any published version and switch between them
 - **Flexible output**: Multiple output formats for different use cases
-- **Text normalization**: Unicode normalization and text conversion utilities
 
 ## 📖 Table of Contents
 
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Usage Examples](#usage-examples)
-- [Command Reference](#command-reference)
-- [Database Management](#database-management)
-- [Text Normalization](#text-normalization)
-- [Contributing](#contributing)
-- [License](#license)
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Usage Examples](#-usage-examples)
+- [Command Reference](#-command-reference)
+- [Database Management](#-database-management)
+- [Text Normalization (deprecated)](#-text-normalization)
+- [Advanced Examples](#-advanced-examples)
+- [Data Sources](#-data-sources)
+- [Development](#-development)
+- [Contributing](#-contributing)
+- [License](#-license)
 
 ## 🛠 Installation
 
@@ -64,7 +67,7 @@ search it, but only its owner can change it (`db update`/`use`/`delete`).
 For the system location this means root.
 
 Multiple Unicode versions can coexist in the same database — see
-[Database Management](#database-management) below.
+[Database Management](#-database-management) below.
 
 ## ⚡ Quick Start
 
@@ -131,17 +134,17 @@ uchr search -d "pray for happiness"
 ### Output Formatting
 
 ```bash
-# Simple format (characters only)
-uchr search ghost -f simple
-👻
+# Simple format (characters only; multiple matches are concatenated)
+uchr search goblin -f simple
+👺
 
-# UTF-8 format
-uchr search ghost -f utf8
-👻 F0 9F 91 BB GHOST
+# UTF-8 format (UTF-8 bytes instead of code points)
+uchr search goblin -f utf8
+👺 F09F91BA JAPANESE GOBLIN
 
 # Custom delimiter
-uchr search ghost -D "|"
-👻|1F47B|GHOST
+uchr search goblin -D "|"
+👺|1F47A|JAPANESE GOBLIN
 ```
 
 ## 🔧 Command Reference
@@ -156,7 +159,7 @@ Search Unicode characters with various criteria.
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--name` | | Search by character name (default) |
+| (none) | | Search by character name (default) |
 | `--code` | `-c` | Search by code point or range |
 | `--char` | `-x` | Search by character |
 | `--block` | `-b` | Search by Unicode block |
@@ -170,14 +173,15 @@ Search Unicode characters with various criteria.
 #### uchr normalize (deprecated)
 
 Unicode text normalization and conversion. Deprecated — see
-[Text Normalization](#text-normalization).
+[Text Normalization](#-text-normalization).
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| `--form` | `-f` | Normalization form: `nfc`, `nfd`, `nfkc`, `nfkd` |
+| `--form` | | Normalization form: `nfc`, `nfd`, `nfkc`, `nfkd` (default: `nfc`) |
 | `--halfwidth` | | Convert fullwidth characters to halfwidth |
 | `--detail` | | Show detailed binary representation |
 | `--compare` | | Show all normalization forms |
+| `--delimiter` | | Delimiter for detailed output (default: space) |
 
 #### uchr db
 
@@ -226,11 +230,15 @@ uchr db list
 ```
 
 ```
-15.0.0
+4.1.0
+5.0.0
+...
 16.0.0 (local) [157667 chars]
 17.0.0 (current) (latest) [162626 chars]
 18.0.0 (draft)
 ```
+
+Versions with no marker are published on unicode.org but not stored locally.
 
 ### Search a Specific Version Without Switching
 
@@ -353,7 +361,7 @@ But when pasted in Twitter or other applications:
 
 ```bash
 # Get just the character
-uchr search ghost -f simple
+uchr search goblin -f simple
 
 # First match only
 uchr search snow -1
@@ -372,7 +380,7 @@ uchr search -d "dragon"
 uchr search -b "Mathematical" | head -10
 ```
 
-## 🏗 Data Sources
+## 📚 Data Sources
 
 This tool fetches official Unicode data directly from
 [unicode.org](https://www.unicode.org/Public/) — the Unicode Character
@@ -417,8 +425,8 @@ Bump `version` in `pyproject.toml`, merge it to `main`, then push a matching
 tag:
 
 ```bash
-git tag v1.0.0
-git push origin v1.0.0
+git tag -a vX.Y.Z -m "vX.Y.Z"
+git push origin vX.Y.Z
 ```
 
 The tag must equal `v` + the `pyproject.toml` version, or the build fails.
