@@ -203,10 +203,35 @@ def test_search_without_keywords_lists_name_matches(annotations, monkeypatch, ca
     assert "uchr db update" in err
 
 
+@pytest.mark.parametrize(
+    "level, value",
+    [("loose", 0.2), ("normal", 0.3), ("Close", 0.5), ("0.4", 0.4), ("1", 1.0)],
+)
+def test_threshold_takes_a_level_or_a_number(level, value):
+    args = create_parser().parse_args(["search", "-t", level, "ghost"])
+    assert args.threshold == value
+
+
 @pytest.mark.parametrize("value", ["0", "1.5", "-0.1", "nan", "high"])
-def test_threshold_must_be_in_unit_interval(value):
+def test_threshold_rejects_other_values(value):
     with pytest.raises(SystemExit):
         create_parser().parse_args(["search", "-t", value, "ghost"])
+
+
+@pytest.mark.parametrize("options", [["-t", "strict"], ["-s", "-t", "strict"]])
+def test_strict_threshold_is_strict_search(stored, capsys, options):
+    args = create_parser().parse_args(["search", *options, "ghost"])
+    args.func(args)
+    assert capsys.readouterr() == ("👻 1F47B GHOST\n", "")
+
+
+def test_strict_threshold_is_ignored_in_block_search(stored, capsys):
+    # A strict block search would need the whole block name.
+    args = create_parser().parse_args(["search", "-b", "-t", "strict", "Emoti"])
+    args.func(args)
+    out, err = capsys.readouterr()
+    assert "Ignore --threshold in block search" in err
+    assert out == "😀 1F600 GRINNING FACE\n"
 
 
 def test_threshold_is_ignored_in_strict_search(stored, capsys):
