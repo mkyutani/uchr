@@ -193,7 +193,7 @@ the database at once; `current_version` (set by `update`/`use`) is what
 
 | Subcommand | Description |
 |------------|-------------|
-| `uchr db update [--version X.Y.Z]` | Fetch a version (default: latest from unicode.org) and switch to it |
+| `uchr db update [--version X.Y.Z] [--verbose]` | Fetch a version (default: latest from unicode.org) and switch to it; `--verbose` lists every skipped code point |
 | `uchr db use <version>` | Switch to a version already stored locally, without downloading |
 | `uchr db list` | List every version unicode.org currently publishes, marking which are stored locally, current, latest, or draft |
 | `uchr db delete <version>` | Delete one version's data |

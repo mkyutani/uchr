@@ -8,12 +8,14 @@ import pytest
 from uchr import database, db
 from uchr.errors import DatabaseError, DownloadError
 from uchr.search import search
+from uchr.uchr import create_parser
 
 UCD_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
 <ucd xmlns="http://www.unicode.org/ns/2003/ucd/1.0">
   <repertoire>
     <char cp="0041" na="LATIN CAPITAL LETTER A" blk="ASCII"/>
     <char cp="1F47B" na="GHOST" blk="Misc_Pictographs"/>
+    <char cp="E000" blk="PUA"/>
     <reserved first-cp="E0080" last-cp="E00FF"/>
   </repertoire>
 </ucd>
@@ -92,6 +94,41 @@ def test_update_stores_version_and_sets_current(fake_network):
     # 2 UCD chars + ghost(dup, skipped) + 2 range + keycap + zwj
     assert local == {"17.0.0": {"draft": False, "chars": 6}}
     assert query("select count(*) from char where version = '17.0.0'") == [(6,)]
+
+
+def test_update_summarizes_skipped_entries(fake_network, capsys):
+    database.update_database()
+
+    err = capsys.readouterr().err
+    assert (
+        "Stored 2 characters for version 17.0.0 "
+        "(skipped 1 unnamed code points, 1 reserved ranges)"
+    ) in err
+    assert "Stored 4 emoji sequences for version 17.0.0 (1 already present)" in err
+    assert "Found " not in err
+    assert "Already registered" not in err
+
+
+def test_update_verbose_lists_each_skipped_entry(fake_network, capsys):
+    database.update_database(verbose=True)
+
+    err = capsys.readouterr().err
+    assert "Found no character: E000" in err
+    assert "Found reserved code(s): E0080-E00FF" in err
+    assert "Already registered: 1F47B ghost" in err
+
+
+def test_db_update_verbose_option(monkeypatch):
+    calls = []
+
+    def fake_update(version=None, verbose=False):
+        calls.append((version, verbose))
+        return 0
+
+    monkeypatch.setattr(database, "update_database", fake_update)
+    args = create_parser().parse_args(["db", "update", "--verbose"])
+    assert args.func(args) == 0
+    assert calls == [(None, True)]
 
 
 def test_db_file_is_created_with_mode_0644(fake_network, db_path):

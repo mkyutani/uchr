@@ -65,30 +65,39 @@ def get_ucd_cp(tag):
     return (min, max)
 
 
-def get_ucd_char_cp(char):
-    value = None
+# Repertoire entries that are not characters: tag -> (summary label,
+# per-range message shown with --verbose).
+_SKIPPED_RANGES = {
+    tag_reserved: ("reserved ranges", "Found reserved code(s)"),
+    tag_noncharacter: ("noncharacter ranges", "Found non character code(s)"),
+    tag_surrogate: ("surrogate ranges", "Found surrogate code(s)"),
+}
+
+
+def get_ucd_char_cp(char, skipped, verbose=False):
+    """Return the code points of a <char> entry. Other entries (reserved,
+    noncharacter, surrogate) return [] and are counted in `skipped`."""
     r = get_ucd_cp(char)
-    if r:
-        min = r[0]
-        max = r[1]
-        if char.tag != tag_char:
-            if min == max:
-                code_range = f"{min:X}"
-            else:
-                code_range = f"{min:X}-{max:X}"
+    if not r:
+        return None
+    first, last = r
+    if char.tag == tag_char:
+        return range(first, last + 1)
 
-            if char.tag == tag_reserved:
-                print(f"Found reserved code(s): {code_range}", file=sys.stderr)
-            elif char.tag == tag_noncharacter:
-                print(f"Found non character code(s): {code_range}", file=sys.stderr)
-            elif char.tag == tag_surrogate:
-                print(f"Found surrogate code(s): {code_range}", file=sys.stderr)
-            else:
-                print(f"Found unknown tag: {char.tag} {code_range}", file=sys.stderr)
-            return []
+    code_range = f"{first:X}" if first == last else f"{first:X}-{last:X}"
+    if char.tag not in _SKIPPED_RANGES:
+        print(f"Found unknown tag: {char.tag} {code_range}", file=sys.stderr)
+        return []
+    label, message = _SKIPPED_RANGES[char.tag]
+    skipped[label] += 1
+    if verbose:
+        print(f"{message}: {code_range}", file=sys.stderr)
+    return []
 
-        value = range(min, max + 1)
-        return value
+
+def _skipped_summary(skipped):
+    parts = [f"{n} {label}" for label, n in skipped.items() if n]
+    return f" (skipped {', '.join(parts)})" if parts else ""
 
 
 def get_name(char):
@@ -129,8 +138,12 @@ def insert_char(conn, name, detail, codetext, char, block, version, codes):
     return char_id
 
 
-def store_ucd(conn, xml_list, version):
-    """Store UCD characters for `version`; the caller owns the transaction."""
+def store_ucd(conn, xml_list, version, verbose=False):
+    """Store UCD characters for `version`; the caller owns the transaction.
+
+    Code points without a name (mostly Private Use) and reserved,
+    noncharacter and surrogate ranges are skipped and reported as counts;
+    `verbose` also prints each one."""
     root = et.parse(io.BytesIO(xml_list)).getroot()
     if root.tag != tag_ucd:
         raise DatabaseError(f"Unexpected XML scheme: {root.tag}")
@@ -138,14 +151,18 @@ def store_ucd(conn, xml_list, version):
     repertoire = root.find(tag_repertoire)
 
     count = 0
+    labels = [label for label, _ in _SKIPPED_RANGES.values()]
+    skipped = dict.fromkeys(["unnamed code points", *labels], 0)
     for char in repertoire:
-        code_range = get_ucd_char_cp(char)
+        code_range = get_ucd_char_cp(char, skipped, verbose)
         if not code_range:
             continue
         for code in code_range:
             name = get_name(char)
             if not name:
-                print(f"Found no character: {code:X}", file=sys.stderr)
+                skipped["unnamed code points"] += 1
+                if verbose:
+                    print(f"Found no character: {code:X}", file=sys.stderr)
                 continue
             detail = get_detail(char, name)
 
@@ -165,7 +182,10 @@ def store_ucd(conn, xml_list, version):
             )
             count = count + 1
 
-    print(f"Stored {count} characters for version {version}", file=sys.stderr)
+    print(
+        f"Stored {count} characters for version {version}" + _skipped_summary(skipped),
+        file=sys.stderr,
+    )
     return count
 
 
@@ -203,9 +223,13 @@ def parse_emoji_line(line):
     return [(emoji_codes, codes, emoji_type, emoji_name)]
 
 
-def store_emoji(conn, emoji_sequences, version):
-    """Store emoji sequences for `version`; the caller owns the transaction."""
+def store_emoji(conn, emoji_sequences, version, verbose=False):
+    """Store emoji sequences for `version`; the caller owns the transaction.
+
+    Sequences already stored (single code points from the UCD) are skipped
+    and reported as a count; `verbose` also prints each one."""
     count = 0
+    duplicates = 0
     for line in emoji_sequences:
         for codetext, codes, emoji_type, emoji_name in parse_emoji_line(line):
             value_char = "".join(chr(c) for c in codes)
@@ -222,9 +246,18 @@ def store_emoji(conn, emoji_sequences, version):
                 )
                 count = count + 1
             except sqlite3.IntegrityError:
-                print(f"Already registered: {codetext} {emoji_name}", file=sys.stderr)
+                duplicates += 1
+                if verbose:
+                    print(
+                        f"Already registered: {codetext} {emoji_name}",
+                        file=sys.stderr,
+                    )
 
-    print(f"Stored {count} emoji characters for version {version}", file=sys.stderr)
+    summary = f" ({duplicates} already present)" if duplicates else ""
+    print(
+        f"Stored {count} emoji sequences for version {version}{summary}",
+        file=sys.stderr,
+    )
     return count
 
 
@@ -272,13 +305,13 @@ def resolve_search_version(requested_version):
     return current, None
 
 
-def update_database(version=None):
+def update_database(version=None, verbose=False):
     """Fetch a Unicode version into the DB and switch current_version to it.
 
     If `version` is omitted, resolve `latest` from unicode.org. A version
     that is already stored is not downloaded again, unless it was stored as
     draft data (drafts change until release). Draft data is accepted with a
-    warning.
+    warning. Skipped entries are summarized; `verbose` lists each one.
     """
     db = Database()
     db.open_for_write()
@@ -306,7 +339,7 @@ def update_database(version=None):
                     f"Warning: no emoji data published for version {version}",
                     file=sys.stderr,
                 )
-            _store_version(version, draft, xml_list, sequences, zwj_sequences)
+            _store_version(version, draft, xml_list, sequences, zwj_sequences, verbose)
     except DownloadError as e:
         print(f"Failed to fetch version {version or 'latest'}: {e}", file=sys.stderr)
         return 1
@@ -316,18 +349,18 @@ def update_database(version=None):
     return 0
 
 
-def _store_version(version, draft, xml_list, sequences, zwj_sequences):
+def _store_version(version, draft, xml_list, sequences, zwj_sequences, verbose):
     """Replace all rows of `version` in one transaction, so an interrupted
     update never leaves a half-stored version behind."""
     with Connection() as conn:
         with conn:
             delete_version_rows(conn, version)
-            count = store_ucd(conn, xml_list, version)
+            count = store_ucd(conn, xml_list, version, verbose)
             if count == 0:
                 raise DatabaseError(f"No characters stored for version {version}")
-            for lines in (sequences, zwj_sequences):
-                if lines:
-                    count += store_emoji(conn, lines, version)
+            emoji_lines = [*(sequences or []), *(zwj_sequences or [])]
+            if emoji_lines:
+                count += store_emoji(conn, emoji_lines, version, verbose)
             conn.execute(
                 "insert into version(version, draft, char_count) values(?, ?, ?)",
                 (version, int(draft), count),

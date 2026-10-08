@@ -77,7 +77,7 @@ def db_update_command(args):
     """Handle uchr db update subcommand"""
     from .database import update_database
 
-    return update_database(version=args.version)
+    return update_database(version=args.version, verbose=args.verbose)
 
 
 def db_use_command(args):
@@ -241,6 +241,11 @@ Examples:
         default=None,
         metavar="X.Y.Z",
         help="Version to fetch (default: resolve latest from unicode.org)",
+    )
+    db_update_parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="List every skipped code point, range and duplicate emoji",
     )
     db_update_parser.set_defaults(func=db_update_command)
 
