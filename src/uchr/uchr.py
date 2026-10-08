@@ -38,18 +38,22 @@ def search_command(args):
     if (by == "code" or by == "char") and args.strict:
         print(f"warning: Ignore --strict in {by} search", file=sys.stderr)
 
+    strict = args.strict
     threshold = args.threshold
     if threshold is None:
         threshold = DEFAULT_THRESHOLD
-    elif by != "name" or args.strict:
+    elif by != "name" or (strict and threshold != "strict"):
         mode = "strict" if by == "name" else by
         print(f"warning: Ignore --threshold in {mode} search", file=sys.stderr)
+        threshold = DEFAULT_THRESHOLD
+    elif threshold == "strict":
+        strict, threshold = True, DEFAULT_THRESHOLD
 
     search(
         args.expression,
         by,
         args.delimiter,
-        strict=args.strict,
+        strict=strict,
         first=args.first,
         output_format=args.format,
         version=version,
@@ -57,14 +61,25 @@ def search_command(args):
     )
 
 
-def similarity(text):
-    """argparse type for --threshold: a number in (0, 1]."""
+def threshold_level(text):
+    """argparse type for --threshold: a named minimum similarity such as
+    "close", a number in (0, 1], or "strict" for -s."""
+    from .search import THRESHOLDS
+
+    level = text.lower()
+    if level == "strict":
+        return level
+    if level in THRESHOLDS:
+        return THRESHOLDS[level]
     try:
         value = float(text)
     except ValueError:
         value = math.nan
     if not 0 < value <= 1:
-        raise argparse.ArgumentTypeError(f"must be a number in (0, 1]: {text}")
+        names = ", ".join([*THRESHOLDS, "strict"])
+        raise argparse.ArgumentTypeError(
+            f"must be {names} or a number in (0, 1]: {text}"
+        )
     return value
 
 
@@ -126,7 +141,7 @@ def db_delete_command(args):
 
 def create_parser():
     """Create the main argument parser with subcommands"""
-    from .search import DEFAULT_THRESHOLD
+    from .search import THRESHOLDS
 
     parser = argparse.ArgumentParser(
         prog="uchr",
@@ -135,7 +150,7 @@ def create_parser():
         epilog="""
 Examples:
   uchr search ghost                    # Emoji for 'ghost', then other matches
-  uchr search ghost -t 0.4            # Only closely related emoji
+  uchr search ghost -t close          # Only closely related emoji
   uchr search -s ghost                # Exact name only, no related emoji
   uchr search -c 1F47A-1F480          # Search by code range
   uchr search -x 👻                   # Search by character
@@ -197,13 +212,15 @@ Examples:
         action="store_true",
         help="Match name strictly (case insensitive), without related emoji",
     )
+    levels = ", ".join(f"{name} ({value})" for name, value in THRESHOLDS.items())
     search_parser.add_argument(
         "-t",
         "--threshold",
-        type=similarity,
+        type=threshold_level,
         default=None,
-        metavar="SCORE",
-        help=f"Minimum similarity (0-1) of related emoji (default: {DEFAULT_THRESHOLD})",
+        metavar="LEVEL",
+        help=f"Minimum similarity of related emoji: {levels}, a number in (0, 1], "
+        "or strict for -s (default: normal)",
     )
     search_parser.add_argument(
         "-1", "--first", action="store_true", help="Show first result only"

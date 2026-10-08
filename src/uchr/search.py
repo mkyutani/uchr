@@ -8,8 +8,10 @@ from collections import Counter
 from .cldr import VARIATION_SELECTOR_16, strip_vs16
 from .db import Connection, Cursor
 
-# Minimum similarity (0-1) for a related emoji to be listed.
-DEFAULT_THRESHOLD = 0.3
+# Minimum similarity (0-1) for a related emoji to be listed, by the names
+# that -t takes; -t strict, the narrowest, is -s.
+THRESHOLDS = {"loose": 0.2, "normal": 0.3, "close": 0.5}
+DEFAULT_THRESHOLD = THRESHOLDS["normal"]
 
 
 def whole_words(fragment):

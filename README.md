@@ -136,11 +136,16 @@ All results are ranked together by a score from 0 to 1, ties in code order:
   threshold (`-t`) only drops related emoji that do not match by word,
   so it never changes the order of the rest.
 
-```bash
-# Only closely related emoji (default threshold: 0.3)
-uchr search ghost -t 0.4
+`-t` sets how close a related emoji must be, from widest to narrowest:
+`loose` (similarity 0.2 or more), `normal` (0.3, the default), `close`
+(0.5), or any number in (0, 1]. `strict`, the narrowest, is `-s`: the
+exact name only, without CJK meanings or related emoji.
 
-# Exact name only, no related emoji
+```bash
+# Only closely related emoji
+uchr search ghost -t close
+
+# Exact name only (same as -t strict)
 uchr search -s ghost
 ```
 
@@ -234,7 +239,7 @@ Search Unicode characters with various criteria.
 | `--block` | `-b` | Search by Unicode block |
 | `--detail` | `-d` | Search names and CJK meanings for whole words, without related emoji |
 | `--strict` | `-s` | Exact match (case insensitive), without related emoji |
-| `--threshold` | `-t` | Minimum similarity (0–1) of related emoji (default: 0.3) |
+| `--threshold` | `-t` | How close a related emoji must be: `loose`, `normal` (default), `close`, a minimum similarity in (0, 1], or `strict` (same as `-s`) |
 | `--first` | `-1` | Show first result only |
 | `--format` | `-f` | Output format: `utf8`, `simple` |
 | `--delimiter` | `-D` | Custom delimiter (default: space) |
