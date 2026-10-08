@@ -6,7 +6,7 @@ import zipfile
 import pytest
 import requests
 
-from uchr import http_utils, unicode_source
+from uchr import cldr, http_utils, unicode_source
 from uchr.errors import DownloadError
 
 PUBLIC = "www.unicode.org/Public"
@@ -14,6 +14,7 @@ LATEST_ZIP = f"https://{PUBLIC}/latest/ucdxml/ucd.all.flat.zip"
 ZIP_18 = f"{PUBLIC}/18.0.0/ucdxml/ucd.all.flat.zip"
 ZIP_19 = f"{PUBLIC}/19.0.0/ucdxml/ucd.all.flat.zip"
 DRAFT_ZIP = f"{PUBLIC}/draft/ucdxml/ucd.all.flat.zip"
+CLDR_TAG = "https://github.com/unicode-org/cldr/releases/tag/"
 
 
 def _zip_bytes(name, data):
@@ -134,3 +135,30 @@ def test_http_get_upgrades_an_http_url(serve):
 
     assert http_utils.http_get(f"http://{PUBLIC}/").text == "index"
     assert adapter.requested == [f"https://{PUBLIC}/"]
+
+
+@pytest.mark.parametrize(
+    "tag, release", [("release-48-2", "48.2"), ("release-49", "49")]
+)
+def test_latest_cldr_release_is_read_from_redirect(serve, tag, release):
+    serve(
+        {
+            cldr.LATEST_RELEASE_URL: redirect(CLDR_TAG + tag),
+            CLDR_TAG + tag: (200, {}, b""),
+        }
+    )
+
+    assert cldr.resolve_latest_release() == release
+
+
+def test_unexpected_cldr_tag_is_an_error(serve):
+    tag = "release-49-beta3"
+    serve(
+        {
+            cldr.LATEST_RELEASE_URL: redirect(CLDR_TAG + tag),
+            CLDR_TAG + tag: (200, {}, b""),
+        }
+    )
+
+    with pytest.raises(DownloadError, match="Could not determine CLDR release"):
+        cldr.resolve_latest_release()

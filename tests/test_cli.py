@@ -37,6 +37,8 @@ def db_path(tmp_path, monkeypatch):
 def stored_db(db_path, monkeypatch):
     monkeypatch.setattr(database, "download_ucd", lambda url: (UCD_XML, url))
     monkeypatch.setattr(database, "download_emoji_pair", lambda v: (None, None))
+    monkeypatch.setattr(database, "resolve_latest_release", lambda: "48.2")
+    monkeypatch.setattr(database, "download_annotations", lambda r: b"<ldml/>")
     assert database.update_database(version="17.0.0") == 0
     return db_path
 
