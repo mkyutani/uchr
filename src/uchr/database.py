@@ -8,7 +8,13 @@ from pathlib import Path
 from urllib.parse import urlparse
 from xml.etree import ElementTree
 
-from .db import Connection, Database, delete_version_rows
+from .cldr import (
+    FALLBACK_RELEASE,
+    download_annotations,
+    parse_annotations,
+    resolve_latest_release,
+)
+from .db import Connection, Database, delete_version_rows, set_meta
 from .errors import DatabaseError, DownloadError
 from .http_utils import download_zip_file
 from .unicode_source import (
@@ -97,7 +103,7 @@ def _skipped_summary(skipped):
     return f" (skipped {', '.join(parts)})" if parts else ""
 
 
-def get_name(char):
+def get_name(char, code):
     value = []
     name = char.attrib.get("na")
     name1 = char.attrib.get("na1")
@@ -110,7 +116,12 @@ def get_name(char):
             alias_name = alias.attrib.get("alias")
             if alias_name and len(alias_name) > 0 and alias_name not in value:
                 value.append(alias_name)
-    return "; ".join(value)
+    name = "; ".join(value)
+    # Names derived from the code point, like CJK UNIFIED IDEOGRAPH-4E00,
+    # are written once for a whole range as "CJK UNIFIED IDEOGRAPH-#".
+    if name.endswith("-#"):
+        name = name[:-1] + f"{code:X}"
+    return name
 
 
 def get_detail(char, name):
@@ -155,7 +166,7 @@ def store_ucd(conn, xml_list, version, verbose=False):
         if not code_range:
             continue
         for code in code_range:
-            name = get_name(char)
+            name = get_name(char, code)
             if not name:
                 skipped["unnamed code points"] += 1
                 if verbose:
@@ -343,7 +354,47 @@ def update_database(version=None, verbose=False):
 
     db.set_current_version(version)
     print(f"Switched current version to {version}", file=sys.stderr)
+    update_keywords(db)
     return 0
+
+
+def update_keywords(db):
+    """Store the CLDR keywords used for related-name search, unless the
+    latest CLDR release is already stored. Keywords are optional, so a
+    failure is a warning: name search still works, only without related
+    results (or with the keywords stored before)."""
+    stored = db.get_keyword_release()
+    try:
+        release = resolve_latest_release()
+    except DownloadError as e:
+        if stored:
+            print(f"Warning: {e}; keeping CLDR {stored} keywords", file=sys.stderr)
+            return
+        release = FALLBACK_RELEASE
+        print(f"Warning: {e}; using CLDR {release}", file=sys.stderr)
+    if release == stored:
+        return
+
+    try:
+        keywords = parse_annotations(download_annotations(release))
+    except (DownloadError, ElementTree.ParseError) as e:
+        print(f"Warning: failed to fetch CLDR keywords: {e}", file=sys.stderr)
+        return
+    if not keywords:
+        print("Warning: no keywords found in CLDR annotations", file=sys.stderr)
+        return
+    with Connection() as conn:
+        with conn:
+            conn.execute("delete from keyword")
+            conn.executemany(
+                "insert into keyword(char, keyword) values(?, ?)",
+                [(char, word) for char, words in keywords.items() for word in words],
+            )
+            set_meta(conn, "keyword_release", release)
+    print(
+        f"Stored keywords for {len(keywords)} emoji from CLDR {release}",
+        file=sys.stderr,
+    )
 
 
 def _store_version(version, draft, xml_list, sequences, zwj_sequences, verbose):

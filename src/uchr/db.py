@@ -37,7 +37,7 @@ data_dir = get_data_dir()
 unicode_sqlite3_database_path = str(data_dir / "unicode.db")
 
 # Bump when the schema changes, and add the matching step to _migrate().
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
 
 # Version label for rows written before the `version` column existed: the
 # data source used to be hardcoded to Public/15.0.0.
@@ -117,19 +117,30 @@ class Database:
 
     def get_current_version(self):
         with Connection() as conn:
-            row = conn.execute(
-                "select value from db_meta where key = 'current_version'"
-            ).fetchone()
-        return row[0] if row else None
+            return get_meta(conn, "current_version")
 
     def set_current_version(self, version):
         with Connection() as conn:
             with conn:
-                conn.execute(
-                    "insert into db_meta(key, value) values('current_version', ?) "
-                    "on conflict(key) do update set value = excluded.value",
-                    (version,),
-                )
+                set_meta(conn, "current_version", version)
+
+    def get_keyword_release(self):
+        """CLDR release of the stored keywords, or None if none are stored."""
+        with Connection() as conn:
+            return get_meta(conn, "keyword_release")
+
+
+def get_meta(conn, key):
+    row = conn.execute("select value from db_meta where key = ?", (key,)).fetchone()
+    return row[0] if row else None
+
+
+def set_meta(conn, key, value):
+    conn.execute(
+        "insert into db_meta(key, value) values(?, ?) "
+        "on conflict(key) do update set value = excluded.value",
+        (key, value),
+    )
 
 
 def delete_version_rows(conn, version):
@@ -175,65 +186,94 @@ def _migrate(conn):
     with conn:
         # Python's sqlite3 does not open a transaction for DDL on its own.
         conn.execute("begin immediate")
-        # 0 -> 1: a DB from before versioning (no `version` column), or a
-        # brand-new empty file. `create table if not exists` won't add
-        # columns to an existing table, so legacy tables need ALTER TABLE.
-        conn.execute(
-            "create table if not exists char("
-            "id integer primary key, name text, detail text, "
-            "codetext text, char text, block text, version text)"
-        )
-        # codepoint.char (= char.id) is unique across all versions, so
-        # codepoint rows resolve to a version via char and need no own
-        # version column.
-        conn.execute(
-            "create table if not exists codepoint("
-            "char integer, seq integer, code integer, "
-            "primary key(char, seq))"
-        )
-        conn.execute(
-            "create table if not exists version("
-            "version text primary key, draft integer not null default 0, "
-            "char_count integer not null default 0)"
-        )
-        conn.execute(
-            "create table if not exists db_meta(key text primary key, value text)"
-        )
+        if _schema_version(conn) < 1:
+            _migrate_to_1(conn)
+        if _schema_version(conn) < 2:
+            _migrate_to_2(conn)
+        if _schema_version(conn) < 3:
+            _migrate_to_3(conn)
 
-        if "version" not in _table_columns(conn, "char"):
-            conn.execute("alter table char add column version text")
-        # An unreleased build labelled legacy rows "15.0"; normalize to X.Y.Z.
-        conn.execute(
-            "update char set version = ? where version = '15.0'", (LEGACY_VERSION,)
+
+def _migrate_to_1(conn):
+    """0 -> 1: a DB from before versioning (no `version` column), or a
+    brand-new empty file."""
+    # `create table if not exists` won't add columns to an existing
+    # table, so legacy tables need ALTER TABLE.
+    conn.execute(
+        "create table if not exists char("
+        "id integer primary key, name text, detail text, "
+        "codetext text, char text, block text, version text)"
+    )
+    # codepoint.char (= char.id) is unique across all versions, so
+    # codepoint rows resolve to a version via char and need no own
+    # version column.
+    conn.execute(
+        "create table if not exists codepoint("
+        "char integer, seq integer, code integer, "
+        "primary key(char, seq))"
+    )
+    conn.execute(
+        "create table if not exists version("
+        "version text primary key, draft integer not null default 0, "
+        "char_count integer not null default 0)"
+    )
+    conn.execute("create table if not exists db_meta(key text primary key, value text)")
+
+    if "version" not in _table_columns(conn, "char"):
+        conn.execute("alter table char add column version text")
+    # An unreleased build labelled legacy rows "15.0"; normalize to X.Y.Z.
+    conn.execute(
+        "update char set version = ? where version = '15.0'", (LEGACY_VERSION,)
+    )
+    conn.execute(
+        "update db_meta set value = ? where key = 'current_version' and value = '15.0'",
+        (LEGACY_VERSION,),
+    )
+    legacy_count = conn.execute(
+        "update char set version = ? where version is null", (LEGACY_VERSION,)
+    ).rowcount
+    if legacy_count:
+        print(
+            f"Migrated {legacy_count} pre-versioning rows to version {LEGACY_VERSION}",
+            file=sys.stderr,
         )
         conn.execute(
-            "update db_meta set value = ? where key = 'current_version' "
-            "and value = '15.0'",
+            "insert or ignore into db_meta(key, value) values('current_version', ?)",
             (LEGACY_VERSION,),
         )
-        legacy_count = conn.execute(
-            "update char set version = ? where version is null", (LEGACY_VERSION,)
-        ).rowcount
-        if legacy_count:
-            print(
-                f"Migrated {legacy_count} pre-versioning rows to version "
-                f"{LEGACY_VERSION}",
-                file=sys.stderr,
-            )
-            conn.execute(
-                "insert or ignore into db_meta(key, value) "
-                "values('current_version', ?)",
-                (LEGACY_VERSION,),
-            )
-        conn.execute(
-            "insert or ignore into version(version, char_count) "
-            "select version, count(*) from char group by version"
-        )
+    conn.execute(
+        "insert or ignore into version(version, char_count) "
+        "select version, count(*) from char group by version"
+    )
 
-        conn.execute("drop index if exists char_index")
-        conn.execute("create unique index char_index on char(codetext, version)")
-        conn.execute("create index if not exists codepoint_code on codepoint(code)")
-        conn.execute(f"pragma user_version = {SCHEMA_VERSION}")
+    conn.execute("drop index if exists char_index")
+    conn.execute("create unique index char_index on char(codetext, version)")
+    conn.execute("create index if not exists codepoint_code on codepoint(code)")
+    conn.execute("pragma user_version = 1")
+
+
+def _migrate_to_2(conn):
+    """1 -> 2: CLDR emoji keywords for related-name search. Keywords are
+    shared by all Unicode versions; `char` is the emoji without FE0F."""
+    conn.execute(
+        "create table if not exists keyword("
+        "char text, keyword text, primary key(char, keyword))"
+    )
+    conn.execute("pragma user_version = 2")
+
+
+def _migrate_to_3(conn):
+    """2 -> 3: names derived from the code point were stored as the UCD XML
+    writes them, "CJK UNIFIED IDEOGRAPH-#"; spell out the code point, also
+    where `detail` starts with the name."""
+    conn.execute(
+        "update char set "
+        "name = substr(name, 1, length(name) - 1) || codetext, "
+        "detail = substr(name, 1, length(name) - 1) || codetext "
+        "|| substr(detail, length(name) + 1) "
+        "where name like '%-#'"
+    )
+    conn.execute("pragma user_version = 3")
 
 
 class Connection:

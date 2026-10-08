@@ -31,6 +31,12 @@ EMOJI_SEQUENCES = [
 ]
 EMOJI_ZWJ = ["1F468 200D 1F469 ; RGI_Emoji_ZWJ_Sequence ; couple # E2.0"]
 
+ANNOTATIONS_XML = """<ldml><annotations>
+  <annotation cp="👻">creature | ghost | monster</annotation>
+  <annotation cp="👻" type="tts">ghost</annotation>
+</annotations></ldml>
+""".encode()
+
 
 @pytest.fixture(autouse=True)
 def db_path(tmp_path, monkeypatch):
@@ -59,6 +65,8 @@ def fake_network(monkeypatch):
     monkeypatch.setattr(
         database, "download_emoji_pair", lambda v: (EMOJI_SEQUENCES, EMOJI_ZWJ)
     )
+    monkeypatch.setattr(database, "resolve_latest_release", lambda: "48.2")
+    monkeypatch.setattr(database, "download_annotations", lambda r: ANNOTATIONS_XML)
     return calls
 
 
@@ -243,6 +251,7 @@ def test_legacy_db_is_migrated(db_path):
     }
     assert database_.get_current_version() == db.LEGACY_VERSION
     assert query("pragma user_version") == [(db.SCHEMA_VERSION,)]
+    assert query("select count(*) from keyword") == [(0,)]
     # The unique index now spans (codetext, version).
     with db.Connection() as conn:
         conn.execute("insert into char(codetext, version) values('1F47B', '16.0.0')")
@@ -274,4 +283,21 @@ def test_parse_emoji_line():
     ]
     assert database.parse_emoji_line(r"0023 FE0F 20E3 ; K ; keycap: \x{23} # c") == [
         ("0023 FE0F 20E3", [0x23, 0xFE0F, 0x20E3], "K", r"keycap: \x{23}"),
+    ]
+
+
+def test_migration_spells_out_code_point_names(db_path):
+    create_legacy_db(db_path)
+    with sqlite3.connect(db_path) as conn:
+        conn.execute(
+            "insert into char values(2, 'CJK UNIFIED IDEOGRAPH-#', "
+            "'CJK UNIFIED IDEOGRAPH-#; CAT', '732B', '猫', 'CJK')"
+        )
+    db.Database().open_for_read()
+
+    assert query("select name, detail from char where codetext = '732B'") == [
+        ("CJK UNIFIED IDEOGRAPH-732B", "CJK UNIFIED IDEOGRAPH-732B; CAT")
+    ]
+    assert query("select name, detail from char where codetext = '1F47B'") == [
+        ("GHOST", "GHOST")
     ]

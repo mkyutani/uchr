@@ -10,12 +10,13 @@ A powerful command-line tool for searching and exploring Unicode characters, emo
 
 ## 🚀 Features
 
-- **Search by name**: Find characters by their Unicode name
+- **Search by name or meaning**: Find characters by whole words of their Unicode name or, for CJK ideographs, their English meaning
+- **Related emoji**: Search also lists emoji with a similar meaning (`ghost` → 👺 goblin, 👹 ogre), ranked by shared CLDR keywords
 - **Search by code**: Look up characters by code point or range
 - **Search by character**: Reverse lookup from character to details
 - **Search by block**: Explore characters within Unicode blocks
 - **Emoji support**: Full support for emoji sequences and ZWJ sequences
-- **CJK details**: Enhanced descriptions for CJK characters using kDefinition
+- **CJK meanings**: CJK ideographs are shown with their English meaning (Unihan kDefinition) in every search
 - **Multiple Unicode versions**: Fetch any published version and switch between them
 - **Flexible output**: Multiple output formats for different use cases
 
@@ -74,7 +75,7 @@ Multiple Unicode versions can coexist in the same database — see
 ## ⚡ Quick Start
 
 ```bash
-# Search for ghost-related characters
+# Search for ghost, followed by related emoji such as 👺
 uchr search ghost
 
 # Find characters in a code range
@@ -89,14 +90,63 @@ uchr search -b "Emoticons"
 
 ## 📋 Usage Examples
 
-### Search by Name
+### Search by Name or Meaning
 
 ```bash
-uchr search goblin
+uchr search cat
 ```
 ```
-👺 1F47A JAPANESE GOBLIN
+猫 732B CAT
+貓 8C93 CAT
+🐈 1F408 CAT
+😾 1F63E POUTING CAT FACE
+🐯 1F42F TIGER FACE
+...
+鯴 9BF4 CAT FISH
+鲺 9CBA CAT FISH
+🐱 1F431 CAT FACE
+🐅 1F405 TIGER
+...
+猞 731E A WILD CAT; 猞猁, A LYNX
+...
+챁 CC41 HANGUL SYLLABLE CAT
+𐇬 101EC PHAISTOS DISC SIGN CAT
+㣇 38C7 A KIND OF BEAST WITH LONG HAIR, OTHER NAME FOR PIG, FOX, WILD CAT, RACCOON
 ```
+
+The expression must match **whole words**, of the character name or, for
+CJK ideographs, of their English meaning (Unihan `kDefinition`), which is
+shown in place of the name: `cat` finds 猫 (*CAT*) and *HANGUL SYLLABLE
+CAT*, but not *INDICATOR* or *CATTLE*. Search also lists **related
+emoji**, whose [CLDR keywords](#-data-sources) overlap with those of the
+emoji the expression names (🐯 shares *animal* and *cat* with 🐈).
+
+All results are ranked together by a score from 0 to 1, ties in code order:
+
+- **Word matches** score by the share of the meaning (split into items
+  at `;` and `,`) or else of the name that the expression takes up. An
+  item counts half as much as the one before it, so 鬼 (*GHOST; SPIRIT OF
+  DEAD; …*) scores 1 while 孽 (*EVIL; SON OF CONCUBINE; GHOST*) scores
+  less. A partial match is lifted by 1 − (1 − score)², close to doubling
+  it while an exact match stays at 1: 猫 (*CAT*) scores 1, 鯴 (*CAT
+  FISH*) 0.61, 㣇 (*…, WILD CAT, RACCOON*) 0.09.
+- **Related emoji** score by their cosine similarity of keywords, with
+  keywords that many emoji share (like *face*) counting for little; 🐯
+  scores 0.64. An emoji that is both takes the higher score.
+
+```bash
+# Only closely related emoji (default threshold: 0.3)
+uchr search ghost -t 0.4
+
+# Exact name only, no related emoji
+uchr search -s ghost
+```
+
+Related emoji need the keyword data that `uchr db update` fetches; until
+then, search lists the word matches only and prints a note. Only emoji
+have keywords. Emoji newer than the latest CLDR release, and flags and
+skin-tone variants (CLDR's derived annotations), have no keywords and are
+found by name alone.
 
 ### Search by Code Range
 
@@ -118,34 +168,49 @@ uchr search -x 👻
 👻 1F47B GHOST
 ```
 
+CJK ideographs show their English meaning instead of their name in every
+search, and names derived from the code point are spelled out:
+
+```bash
+uchr search -x 猫
+uchr search -c 17000
+```
+```
+猫 732B CAT
+𗀀 17000 TANGUT IDEOGRAPH-17000
+```
+
 ### Search by Unicode Block
 
 ```bash
 uchr search -b "Misc_Pictographs"
 ```
 
-### Search with Details (CJK Characters)
+### Search Without Related Emoji
 
 ```bash
 uchr search -d "pray for happiness"
 ```
 ```
-祝 795D CJK UNIFIED IDEOGRAPH-#; PRAY FOR HAPPINESS OR BLESSINGS
+祝 795D PRAY FOR HAPPINESS OR BLESSINGS
 ```
+
+`-d` searches names and CJK meanings for whole words like the default
+search, best match first, but leaves out related emoji.
 
 ### Output Formatting
 
 ```bash
 # Simple format (characters only; multiple matches are concatenated)
 uchr search goblin -f simple
-👺
+👺䰨䰪👹👽👻👾🐲🧌👼🧚👿䰦
 
 # UTF-8 format (UTF-8 bytes instead of code points)
-uchr search goblin -f utf8
+uchr search -s "japanese goblin" -f utf8
 👺 F09F91BA JAPANESE GOBLIN
 
 # Custom delimiter
-uchr search goblin -D "|"
+uchr search -s "japanese goblin" -D "|"
 👺|1F47A|JAPANESE GOBLIN
 ```
 
@@ -161,12 +226,13 @@ Search Unicode characters with various criteria.
 
 | Option | Short | Description |
 |--------|-------|-------------|
-| (none) | | Search by character name (default) |
+| (none) | | Search names and CJK meanings for whole words, plus related emoji (default) |
 | `--code` | `-c` | Search by code point or range |
 | `--char` | `-x` | Search by character |
 | `--block` | `-b` | Search by Unicode block |
-| `--detail` | `-d` | Search in character details |
-| `--strict` | `-s` | Exact match (case insensitive) |
+| `--detail` | `-d` | Search names and CJK meanings for whole words, without related emoji |
+| `--strict` | `-s` | Exact match (case insensitive), without related emoji |
+| `--threshold` | `-t` | Minimum similarity (0–1) of related emoji (default: 0.3) |
 | `--first` | `-1` | Show first result only |
 | `--format` | `-f` | Output format: `utf8`, `simple` |
 | `--delimiter` | `-D` | Custom delimiter (default: space) |
@@ -218,6 +284,14 @@ uchr db update --version 16.0.0
 A version that is already stored is not downloaded again; `update` just makes
 it current. The exception is a version stored as unreleased draft data, which
 is fetched again so it picks up changes (or the final release).
+
+`update` also keeps the CLDR emoji keywords behind
+[related emoji](#search-by-name) up to date: it looks up the latest CLDR
+release on GitHub and downloads its keywords only when that release isn't
+stored yet. The keywords are shared by all stored versions. A database
+created by an older uchr gets them on its next `uchr db update`. If the
+keywords can't be fetched, `update` warns and still succeeds, keeping any
+keywords stored before.
 
 ### Switch Between Locally Stored Versions
 
@@ -363,7 +437,7 @@ But when pasted in Twitter or other applications:
 
 ```bash
 # Get just the character
-uchr search goblin -f simple
+uchr search -s "japanese goblin" -f simple
 
 # First match only
 uchr search snow -1
@@ -389,6 +463,11 @@ This tool fetches official Unicode data directly from
 Database (`ucdxml`) and Emoji Sequences for whichever version you request
 with `uchr db update`. By default it tracks the latest released version;
 run `uchr db list` to see everything currently published.
+
+Keywords for [related emoji](#search-by-name) come from the English emoji
+annotations of the [Unicode CLDR](https://cldr.unicode.org/) project
+(`common/annotations/en.xml` of the latest release in
+[unicode-org/cldr](https://github.com/unicode-org/cldr)).
 
 ## 🏗 Development
 

@@ -2,6 +2,7 @@
 
 import argparse
 import io
+import math
 import os
 import sys
 
@@ -24,7 +25,7 @@ def wrap_io():
 def search_command(args):
     """Handle uchr search subcommand"""
     from .database import resolve_search_version
-    from .search import search
+    from .search import DEFAULT_THRESHOLD, search
 
     version, error = resolve_search_version(args.unicode_version)
     if error:
@@ -37,6 +38,13 @@ def search_command(args):
     if (by == "code" or by == "char") and args.strict:
         print(f"warning: Ignore --strict in {by} search", file=sys.stderr)
 
+    threshold = args.threshold
+    if threshold is None:
+        threshold = DEFAULT_THRESHOLD
+    elif by != "name" or args.strict:
+        mode = "strict" if by == "name" else by
+        print(f"warning: Ignore --threshold in {mode} search", file=sys.stderr)
+
     search(
         args.expression,
         by,
@@ -45,7 +53,19 @@ def search_command(args):
         first=args.first,
         output_format=args.format,
         version=version,
+        threshold=threshold,
     )
+
+
+def similarity(text):
+    """argparse type for --threshold: a number in (0, 1]."""
+    try:
+        value = float(text)
+    except ValueError:
+        value = math.nan
+    if not 0 < value <= 1:
+        raise argparse.ArgumentTypeError(f"must be a number in (0, 1]: {text}")
+    return value
 
 
 def normalize_command(args):
@@ -106,13 +126,17 @@ def db_delete_command(args):
 
 def create_parser():
     """Create the main argument parser with subcommands"""
+    from .search import DEFAULT_THRESHOLD
+
     parser = argparse.ArgumentParser(
         prog="uchr",
         description="Unicode character tools",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  uchr search ghost                    # Search for characters named 'ghost'
+  uchr search ghost                    # Emoji for 'ghost', then other matches
+  uchr search ghost -t 0.4            # Only closely related emoji
+  uchr search -s ghost                # Exact name only, no related emoji
   uchr search -c 1F47A-1F480          # Search by code range
   uchr search -x 👻                   # Search by character
   uchr search -b "Emoticons"          # Search by Unicode block
@@ -164,14 +188,22 @@ Examples:
         action="store_const",
         dest="by",
         const="detail",
-        help="Search by character details",
+        help="Search names and CJK meanings without related emoji",
     )
 
     search_parser.add_argument(
         "-s",
         "--strict",
         action="store_true",
-        help="Match name strictly (case insensitive)",
+        help="Match name strictly (case insensitive), without related emoji",
+    )
+    search_parser.add_argument(
+        "-t",
+        "--threshold",
+        type=similarity,
+        default=None,
+        metavar="SCORE",
+        help=f"Minimum similarity (0-1) of related emoji (default: {DEFAULT_THRESHOLD})",
     )
     search_parser.add_argument(
         "-1", "--first", action="store_true", help="Show first result only"
