@@ -145,6 +145,45 @@ def test_threshold_drops_less_similar_emoji(stored, capsys):
     ]
 
 
+CAT_UCD_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
+<ucd xmlns="http://www.unicode.org/ns/2003/ucd/1.0">
+  <repertoire>
+    <char cp="A2B6" na="YI SYLLABLE CAT" blk="Yi_Syllables"/>
+    <char cp="1F408" na="CAT" blk="Misc_Pictographs"/>
+    <char cp="1F415" na="DOG" blk="Misc_Pictographs"/>
+    <char cp="1F600" na="GRINNING FACE" blk="Emoticons"/>
+    <char cp="1F639" na="CAT FACE WITH TEARS OF JOY" blk="Emoticons"/>
+  </repertoire>
+</ucd>
+"""
+
+CAT_ANNOTATIONS_XML = """<ldml><annotations>
+  <annotation cp="🐈">animal | cat | pet</annotation>
+  <annotation cp="🐕">animal | dog | pet</annotation>
+  <annotation cp="😀">face | grin | smile</annotation>
+  <annotation cp="😹">cat | face | joy | laugh | tear</annotation>
+</annotations></ldml>
+""".encode()
+
+
+def test_threshold_keeps_the_order_of_word_matches(annotations, monkeypatch, capsys):
+    # 😹 matches by name (0.22) and keywords (0.76), and ranks by 0.76 over
+    # ꊶ (0.36) at any threshold; the threshold only drops 🐕 (0.31).
+    monkeypatch.setattr(database, "download_ucd", lambda url: (CAT_UCD_XML, url))
+    monkeypatch.setattr(database, "download_emoji_pair", lambda v: ([], None))
+    monkeypatch.setattr(database, "download_annotations", lambda r: CAT_ANNOTATIONS_XML)
+    database.update_database(version="17.0.0")
+    capsys.readouterr()
+
+    word_matches = [
+        "🐈 1F408 CAT",
+        "😹 1F639 CAT FACE WITH TEARS OF JOY",
+        "ꊶ A2B6 YI SYLLABLE CAT",
+    ]
+    assert search_lines(capsys, "cat") == word_matches + ["🐕 1F415 DOG"]
+    assert search_lines(capsys, "cat", threshold=0.8) == word_matches
+
+
 def test_keyword_seeds_match_emoji_with_and_without_fe0f(stored, capsys):
     # No name contains "cold"; both snowman rows share the ☃ keywords.
     assert search_lines(capsys, "cold") == [

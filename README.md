@@ -132,7 +132,9 @@ All results are ranked together by a score from 0 to 1, ties in code order:
   FISH*) 0.61, 㣇 (*…, WILD CAT, RACCOON*) 0.09.
 - **Related emoji** score by their cosine similarity of keywords, with
   keywords that many emoji share (like *face*) counting for little; 🐯
-  scores 0.64. An emoji that is both takes the higher score.
+  scores 0.64. An emoji that is both takes the higher score. The
+  threshold (`-t`) only drops related emoji that do not match by word,
+  so it never changes the order of the rest.
 
 ```bash
 # Only closely related emoji (default threshold: 0.3)

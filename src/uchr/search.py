@@ -159,11 +159,15 @@ def search(
                 if score:
                     scores[row[0]] = (score, row)
             if by == "name":
+                # The threshold decides which emoji to add, not how word
+                # matches rank: a word match takes its similarity when
+                # higher, whatever the threshold.
                 matched = [row for _score, row in scores.values()]
-                for score, row in related_emoji(
-                    conn, fragment, matched, version, threshold
-                ):
-                    if score > scores.get(row[0], (0,))[0]:
+                for score, row in related_emoji(conn, fragment, matched, version):
+                    if row[0] not in scores:
+                        if score >= threshold:
+                            scores[row[0]] = (score, row)
+                    elif score > scores[row[0]][0]:
                         scores[row[0]] = (score, row)
             ranked = sorted(scores.values(), key=lambda s: (-s[0], s[1][3] or ""))
             char_list = [row for _score, row in ranked]
@@ -190,9 +194,8 @@ def search(
                 print(delimiter.join([char, codetext, shown_text(text, name)]))
 
 
-def related_emoji(conn, fragment, matched, version, threshold):
-    """Return (similarity, row) for the emoji related to `fragment`, those
-    whose similarity reaches `threshold`.
+def related_emoji(conn, fragment, matched, version):
+    """Return (similarity, row) for the emoji related to `fragment`.
 
     The emoji that `fragment` names directly (a CLDR keyword, or a whole
     word of their name: the `matched` rows) are the seeds; every emoji is
@@ -219,11 +222,7 @@ def related_emoji(conn, fragment, matched, version, threshold):
     if not seeds:
         return []
 
-    scores = {
-        char: score
-        for char, score in rank_related(keywords, seeds).items()
-        if score >= threshold
-    }
+    scores = rank_related(keywords, seeds)
     if not scores:
         return []
     rows = conn.execute(
