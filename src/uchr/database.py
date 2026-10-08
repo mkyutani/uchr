@@ -4,9 +4,9 @@ import io
 import re
 import sqlite3
 import sys
-import xml.etree.ElementTree as et
 from pathlib import Path
 from urllib.parse import urlparse
+from xml.etree import ElementTree
 
 from .db import Connection, Database, delete_version_rows
 from .errors import DatabaseError, DownloadError
@@ -59,10 +59,7 @@ def get_ucd_cp(tag):
         )
         return None
 
-    min = int(first_cp, 16)
-    max = int(last_cp, 16)
-
-    return (min, max)
+    return (int(first_cp, 16), int(last_cp, 16))
 
 
 # Repertoire entries that are not characters: tag -> (summary label,
@@ -144,7 +141,7 @@ def store_ucd(conn, xml_list, version, verbose=False):
     Code points without a name (mostly Private Use) and reserved,
     noncharacter and surrogate ranges are skipped and reported as counts;
     `verbose` also prints each one."""
-    root = et.parse(io.BytesIO(xml_list)).getroot()
+    root = ElementTree.parse(io.BytesIO(xml_list)).getroot()
     if root.tag != tag_ucd:
         raise DatabaseError(f"Unexpected XML scheme: {root.tag}")
 

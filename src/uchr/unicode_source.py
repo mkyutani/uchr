@@ -8,7 +8,6 @@ to be draft data, say so, but the data is still valid.
 """
 
 import re
-from typing import List, Optional, Tuple
 
 from .errors import DownloadError
 from .http_utils import http_get
@@ -20,7 +19,7 @@ _VERSION_IN_URL = re.compile(r"/Public/(\d+\.\d+\.\d+)/")
 _VERSION_DIR = re.compile(r'href="(\d+\.\d+\.\d+)/"')
 
 
-def version_key(version: str) -> Tuple[int, ...]:
+def version_key(version: str) -> tuple[int, ...]:
     return tuple(int(p) for p in version.split("."))
 
 
@@ -28,7 +27,7 @@ def ucd_zip_url(version: str) -> str:
     return f"https://www.unicode.org/Public/{version}/ucdxml/ucd.all.flat.zip"
 
 
-def resolve_latest_version() -> Tuple[str, str]:
+def resolve_latest_version() -> tuple[str, str]:
     """Resolve the current released version by following the `latest` redirect.
 
     Returns (version, resolved_zip_url). Raises DownloadError if the version
@@ -52,7 +51,7 @@ def is_draft_url(url: str) -> bool:
     return "draft" in url
 
 
-def list_published_versions() -> List[str]:
+def list_published_versions() -> list[str]:
     """Scrape unicode.org/Public/ for all published Unicode versions (X.Y.Z)."""
     try:
         res = http_get(PUBLIC_INDEX_URL)
@@ -64,7 +63,7 @@ def list_published_versions() -> List[str]:
     return sorted(set(versions), key=version_key)
 
 
-def check_version_status(version: str) -> Optional[str]:
+def check_version_status(version: str) -> str | None:
     """Check whether a version above `latest` is real or still a draft.
 
     Returns "draft" if the fetch redirects to draft data, "released" if it
@@ -82,7 +81,7 @@ def check_version_status(version: str) -> Optional[str]:
     return "draft" if is_draft_url(res.url) else "released"
 
 
-def emoji_urls(version: str) -> List[str]:
+def emoji_urls(version: str) -> list[str]:
     """Candidate (sequences_url, zwj_url) pairs to probe in order for a version.
 
     Unicode.org's emoji file layout has changed over time (verified cutover
@@ -102,7 +101,7 @@ def emoji_urls(version: str) -> List[str]:
     ]
 
 
-def _get_lines(url: str) -> Optional[List[str]]:
+def _get_lines(url: str) -> list[str] | None:
     """GET a text file; None if it doesn't exist (404), DownloadError on any
     other failure so a network problem isn't mistaken for "no such file"."""
     try:
@@ -118,7 +117,7 @@ def _get_lines(url: str) -> Optional[List[str]]:
 
 def download_emoji_pair(
     version: str,
-) -> Tuple[Optional[List[str]], Optional[List[str]]]:
+) -> tuple[list[str] | None, list[str] | None]:
     """Return the lines of (emoji-sequences, emoji-zwj-sequences) for a
     version, probing each candidate layout from emoji_urls() in order.
     (None, None) means no candidate exists, e.g. versions before emoji data

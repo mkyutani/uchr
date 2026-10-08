@@ -1,6 +1,5 @@
 """Basic tests for uchr package."""
 
-import pytest
 from uchr import uchr
 
 
@@ -13,7 +12,6 @@ def test_package_import():
 
 def test_uchr_module_import():
     """Test that the uchr module can be imported."""
-    from uchr import uchr
 
     assert uchr is not None
 

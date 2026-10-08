@@ -1,7 +1,6 @@
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Tuple
 
 import requests
 
@@ -39,7 +38,7 @@ def http_get(url: str, **kwargs) -> requests.Response:
     return _session.get(_to_https(url), **kwargs)
 
 
-def download_zip_file(url: str, target_filename: str) -> Tuple[bytes, str]:
+def download_zip_file(url: str, target_filename: str) -> tuple[bytes, str]:
     """Download a ZIP file and extract the specified file as bytes.
 
     Returns (data, final URL after redirects).

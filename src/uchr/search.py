@@ -8,9 +8,7 @@ from .db import Connection, Cursor
 def get_code_range(fragment):
     if "-" in fragment:
         m = re.match("([0-9A-Fa-f]+)-([0-9A-Fa-f]+)", fragment)
-        min = int(m.group(1), 16)
-        max = int(m.group(2), 16)
-        r = (min, max)
+        r = (int(m.group(1), 16), int(m.group(2), 16))
     else:
         m = re.match("[0-9A-Fa-f]+", fragment)
         r = int(fragment, 16)
@@ -18,10 +16,16 @@ def get_code_range(fragment):
 
 
 def search(
-    fragment, by, delimiter, strict=False, first=False, format=None, version=None
+    fragment,
+    by,
+    delimiter,
+    strict=False,
+    first=False,
+    output_format=None,
+    version=None,
 ):
-    if format is not None:
-        format = format.upper()
+    if output_format is not None:
+        output_format = output_format.upper()
 
     with Connection() as conn:
         char_list = []
@@ -74,17 +78,17 @@ def search(
             cur.execute(dml, params)
             char_list = cur.fetchall()
 
-        if first == True:
+        if first:
             char_list = char_list[0:1]
 
-        for id, codetext, name, char in char_list:
+        for _id, codetext, name, char in char_list:
             if not char:
                 char = str(char)
 
-            if format == "SIMPLE":
+            if output_format == "SIMPLE":
                 print(char, end="")
             else:
-                if format == "UTF8":
+                if output_format == "UTF8":
                     codetext = " ".join(
                         f"{u:X}"
                         for u in [

@@ -43,7 +43,7 @@ def search_command(args):
         args.delimiter,
         strict=args.strict,
         first=args.first,
-        format=args.format,
+        output_format=args.format,
         version=version,
     )
 
