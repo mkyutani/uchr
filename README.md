@@ -1,7 +1,7 @@
 # Unicode Tools (uchr)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![Unicode](https://img.shields.io/badge/Unicode-multi--version-green.svg)](https://unicode.org/)
 [![PyPI version](https://badge.fury.io/py/uchr.svg)](https://badge.fury.io/py/uchr)
 [![PyPI downloads](https://img.shields.io/pypi/dm/uchr.svg)](https://pypi.org/project/uchr/)
@@ -487,7 +487,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📊 Project Status
 
 - **Current Version**: 1.0.0
-- **Python Support**: 3.8+
+- **Python Support**: 3.11+
 - **Unicode Version**: tracks the latest released version by default; multiple versions can coexist locally (see `uchr db list`)
 - **Package Name**: `uchr` (on PyPI)
 - **Repository**: [mkyutani/uchr](https://github.com/mkyutani/uchr)
