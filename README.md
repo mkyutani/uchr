@@ -39,6 +39,8 @@ A powerful command-line tool for searching and exploring Unicode characters, emo
 
 ```bash
 pip install uchr
+# or, as an isolated command-line tool with uv
+uv tool install uchr
 ```
 
 ### Install from source
@@ -46,7 +48,7 @@ pip install uchr
 ```bash
 git clone https://github.com/mkyutani/uchr.git
 cd uchr
-poetry install
+uv tool install .
 ```
 
 ### Initialize database
@@ -390,7 +392,7 @@ run `uchr db list` to see everything currently published.
 
 ## 🏗 Development
 
-This project uses [Poetry](https://python-poetry.org/) for dependency management and packaging.
+This project uses [uv](https://docs.astral.sh/uv/) for dependency management and packaging.
 
 ### Development Setup
 
@@ -399,23 +401,23 @@ This project uses [Poetry](https://python-poetry.org/) for dependency management
 git clone https://github.com/mkyutani/uchr.git
 cd uchr
 
-# Install dependencies
-poetry install
+# Create .venv and install dependencies (from uv.lock)
+uv sync
 
 # Run tests
-poetry run pytest
+uv run pytest
 
 # Format code
-poetry run black src/
+uv run ruff format
 
 # Lint code
-poetry run ruff check src/
+uv run ruff check
 ```
 
 ### Building
 
 ```bash
-poetry build
+uv build
 ```
 
 ### Releasing
@@ -456,9 +458,9 @@ Tests also run on every pull request and push to `main`
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
 3. Make your changes and add tests
-4. Run the test suite: `poetry run pytest`
-5. Format your code: `poetry run black src/`
-6. Lint your code: `poetry run ruff check src/`
+4. Run the test suite: `uv run pytest`
+5. Format your code: `uv run ruff format`
+6. Lint your code: `uv run ruff check`
 7. Commit your changes (`git commit -m 'Add amazing feature'`)
 8. Push to the branch (`git push origin feature/amazing-feature`)
 9. Open a Pull Request
@@ -470,7 +472,7 @@ This project maintains high code quality standards:
 - **Type hints**: All functions should include type annotations
 - **Testing**: New features should include appropriate tests
 - **Documentation**: Update README and docstrings for new features
-- **Code style**: Follow Black formatting and Ruff linting rules
+- **Code style**: Follow Ruff formatting and linting rules
 
 ## 📄 License
 
@@ -479,7 +481,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 🙏 Acknowledgments
 
 - [Unicode Consortium](https://unicode.org/) for maintaining Unicode standards
-- [Poetry](https://python-poetry.org/) for modern Python packaging
+- [uv](https://docs.astral.sh/uv/) for Python packaging and project management
 - Contributors and users of this project
 
 ## 📊 Project Status
