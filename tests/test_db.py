@@ -5,6 +5,7 @@ import sqlite3
 import stat
 
 import pytest
+
 from uchr import database, db
 from uchr.errors import DatabaseError, DownloadError
 from uchr.search import search

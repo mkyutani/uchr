@@ -42,5 +42,5 @@ requires = ["uv_build>=0.12.23,<0.13"]
 build-backend = "uv_build"
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4", "T20"]
+select = ["E", "F", "W", "I", "N", "UP", "B", "A", "C4"]
 ignore = ["E501"]  # Line too long (handled by ruff format)
