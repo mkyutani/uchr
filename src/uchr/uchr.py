@@ -2,7 +2,12 @@
 
 import argparse
 import io
+import os
 import sys
+
+# Exit status shells report for a process killed by SIGPIPE (128 + 13),
+# which is what standard tools return when the reader of a pipe goes away.
+EXIT_BROKEN_PIPE = 141
 
 
 def wrap_io():
@@ -267,19 +272,41 @@ Examples:
     return parser
 
 
+def quiet_broken_pipe():
+    """Handle a closed stdout pipe (e.g. `uchr search ... | head -1`).
+
+    Exit quietly like other Unix tools. stdout is pointed at /dev/null so
+    the final flush at interpreter shutdown doesn't raise BrokenPipeError
+    again (the approach recommended in the Python `signal` docs).
+    """
+    devnull = os.open(os.devnull, os.O_WRONLY)
+    os.dup2(devnull, sys.stdout.fileno())
+    return EXIT_BROKEN_PIPE
+
+
 def main():
     """Main entry point for uchr command"""
     wrap_io()
 
     parser = create_parser()
-    args = parser.parse_args()
-
-    if not hasattr(args, "func"):
-        parser.print_help()
-        return 1
-
     try:
-        return args.func(args) or 0
+        try:
+            args = parser.parse_args()
+        except SystemExit as e:  # after --help or a usage error
+            status = e.code
+        else:
+            if hasattr(args, "func"):
+                status = args.func(args) or 0
+            else:
+                parser.print_help()
+                status = 1
+        # Flush here so a closed pipe is handled below instead of surfacing
+        # as an "Exception ignored" message at interpreter shutdown.
+        # (argparse ignores write errors, so only this flush notices them.)
+        sys.stdout.flush()
+        return status
+    except BrokenPipeError:
+        return quiet_broken_pipe()
     except KeyboardInterrupt:
         print("\nInterrupted", file=sys.stderr)
         return 1

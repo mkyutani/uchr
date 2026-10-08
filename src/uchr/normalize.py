@@ -105,8 +105,5 @@ def normalize_command(
     except UnicodeDecodeError:
         print("Error: Unable to decode file as UTF-8", file=sys.stderr)
         return 1
-    except BrokenPipeError:
-        # Handle pipe operations gracefully
-        pass
 
     return 0
