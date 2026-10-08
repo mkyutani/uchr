@@ -138,8 +138,7 @@ def delete_version_rows(conn, version):
     # codepoint has no version column; it resolves to a version via its
     # char FK, so delete it before the char rows go away.
     conn.execute(
-        "delete from codepoint where char in "
-        "(select id from char where version = ?)",
+        "delete from codepoint where char in (select id from char where version = ?)",
         (version,),
     )
     deleted = conn.execute("delete from char where version = ?", (version,)).rowcount
