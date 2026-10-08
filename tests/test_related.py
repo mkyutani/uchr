@@ -124,13 +124,13 @@ def test_keyword_download_failure_is_only_a_warning(annotations, monkeypatch, ca
     assert db.Database().get_keyword_release() is None
 
 
-def test_related_emoji_mix_with_word_matches_by_score(stored, capsys):
-    # 👺 shares 4 of 5 keywords with 👻 (similarity 0.56); ⻤ is a partial
-    # match (5 of 17 letters, lifted to 0.50).
+def test_related_emoji_follow_word_matches(stored, capsys):
+    # 👺 shares 4 of 5 keywords with 👻 (similarity 0.56) but follows ⻤,
+    # a partial word match (5 of 17 letters, lifted to 0.50).
     assert search_lines(capsys, "ghost") == [
         "👻 1F47B GHOST",
-        "👺 1F47A JAPANESE GOBLIN",
         "⻤ 2EE4 CJK RADICAL GHOST",
+        "👺 1F47A JAPANESE GOBLIN",
     ]
 
 
@@ -166,9 +166,11 @@ CAT_ANNOTATIONS_XML = """<ldml><annotations>
 """.encode()
 
 
-def test_threshold_keeps_the_order_of_word_matches(annotations, monkeypatch, capsys):
-    # 😹 matches by name (0.22) and keywords (0.76), and ranks by 0.76 over
-    # ꊶ (0.36) at any threshold; the threshold only drops 🐕 (0.31).
+def test_threshold_only_drops_related_emoji_at_the_end(
+    annotations, monkeypatch, capsys
+):
+    # 😹 also relates to the seeds (similarity 0.76) but ranks as a word
+    # match, by its words; the threshold only drops 🐕 (0.31) at the end.
     monkeypatch.setattr(database, "download_ucd", lambda url: (CAT_UCD_XML, url))
     monkeypatch.setattr(database, "download_emoji_pair", lambda v: ([], None))
     monkeypatch.setattr(database, "download_annotations", lambda r: CAT_ANNOTATIONS_XML)
@@ -177,8 +179,8 @@ def test_threshold_keeps_the_order_of_word_matches(annotations, monkeypatch, cap
 
     word_matches = [
         "🐈 1F408 CAT",
-        "😹 1F639 CAT FACE WITH TEARS OF JOY",
         "ꊶ A2B6 YI SYLLABLE CAT",
+        "😹 1F639 CAT FACE WITH TEARS OF JOY",
     ]
     assert search_lines(capsys, "cat") == word_matches + ["🐕 1F415 DOG"]
     assert search_lines(capsys, "cat", threshold=0.8) == word_matches
