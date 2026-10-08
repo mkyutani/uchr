@@ -10,10 +10,8 @@ to be draft data, say so, but the data is still valid.
 import re
 from typing import List, Optional, Tuple
 
-import requests
-
 from .errors import DownloadError
-from .http_utils import HTTP_TIMEOUT
+from .http_utils import http_get
 
 PUBLIC_LATEST_URL = "https://www.unicode.org/Public/latest/ucdxml/ucd.all.flat.zip"
 PUBLIC_INDEX_URL = "https://www.unicode.org/Public/"
@@ -37,7 +35,7 @@ def resolve_latest_version() -> Tuple[str, str]:
     can't be determined from the response.
     """
     try:
-        res = requests.get(PUBLIC_LATEST_URL, stream=True, timeout=HTTP_TIMEOUT)
+        res = http_get(PUBLIC_LATEST_URL, stream=True)
         res.close()
     except Exception as e:
         raise DownloadError(f"Failed to resolve latest version: {e}") from e
@@ -57,7 +55,7 @@ def is_draft_url(url: str) -> bool:
 def list_published_versions() -> List[str]:
     """Scrape unicode.org/Public/ for all published Unicode versions (X.Y.Z)."""
     try:
-        res = requests.get(PUBLIC_INDEX_URL, timeout=HTTP_TIMEOUT)
+        res = http_get(PUBLIC_INDEX_URL)
         res.raise_for_status()
     except Exception as e:
         raise DownloadError(f"Failed to list published versions: {e}") from e
@@ -74,7 +72,7 @@ def check_version_status(version: str) -> Optional[str]:
     fetched at all.
     """
     try:
-        res = requests.get(ucd_zip_url(version), stream=True, timeout=HTTP_TIMEOUT)
+        res = http_get(ucd_zip_url(version), stream=True)
         res.close()
     except Exception:
         return None
@@ -108,7 +106,7 @@ def _get_lines(url: str) -> Optional[List[str]]:
     """GET a text file; None if it doesn't exist (404), DownloadError on any
     other failure so a network problem isn't mistaken for "no such file"."""
     try:
-        res = requests.get(url, timeout=HTTP_TIMEOUT)
+        res = http_get(url)
     except Exception as e:
         raise DownloadError(f"Failed to download {url}: {e}") from e
     if res.status_code == 404:
