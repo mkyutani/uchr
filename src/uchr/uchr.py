@@ -35,6 +35,14 @@ def search_command(args):
     # Convert args to match search.search signature
     by = args.by if args.by else "name"
 
+    if by == "detail":
+        print(
+            "warning: 'uchr search -d' is deprecated and will be removed in a "
+            "future release. The default search lists the same matches first, "
+            "followed by related emoji.",
+            file=sys.stderr,
+        )
+
     if (by == "code" or by == "char") and args.strict:
         print(f"warning: Ignore --strict in {by} search", file=sys.stderr)
 
@@ -203,7 +211,7 @@ Examples:
         action="store_const",
         dest="by",
         const="detail",
-        help="Search names and CJK meanings without related emoji",
+        help="(deprecated) Search names and CJK meanings without related emoji",
     )
 
     search_parser.add_argument(
