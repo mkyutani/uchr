@@ -195,7 +195,11 @@ uchr search -c 17000
 uchr search -b "Misc_Pictographs"
 ```
 
-### Search Without Related Emoji
+### Search Without Related Emoji (deprecated)
+
+> **Deprecated:** `-d` will be removed in a future release. The default
+> search lists the same matches first, followed by related emoji. It prints
+> a warning to stderr when used.
 
 ```bash
 uchr search -d "pray for happiness"
@@ -239,7 +243,7 @@ Search Unicode characters with various criteria.
 | `--code` | `-c` | Search by code point or range |
 | `--char` | `-x` | Search by character |
 | `--block` | `-b` | Search by Unicode block |
-| `--detail` | `-d` | Search names and CJK meanings for whole words, without related emoji |
+| `--detail` | `-d` | (deprecated) Search names and CJK meanings for whole words, without related emoji |
 | `--strict` | `-s` | Exact match (case insensitive), without related emoji |
 | `--threshold` | `-t` | How close a related emoji must be: `loose`, `normal` (default), `close`, a minimum similarity in (0, 1], or `strict` (same as `-s`) |
 | `--first` | `-1` | Show first result only |

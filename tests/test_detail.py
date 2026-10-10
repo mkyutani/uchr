@@ -4,6 +4,7 @@ import pytest
 
 from uchr import database, db
 from uchr.search import search
+from uchr.uchr import create_parser, search_command
 
 UCD_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
 <ucd xmlns="http://www.unicode.org/ns/2003/ucd/1.0">
@@ -59,6 +60,13 @@ CAT_LINES = [
 
 def test_detail_search_matches_whole_words_best_first(capsys):
     assert detail_lines(capsys, "cat") == CAT_LINES
+
+
+def test_detail_option_is_deprecated(capsys):
+    search_command(create_parser().parse_args(["search", "-d", "cat"]))
+    captured = capsys.readouterr()
+    assert captured.out.splitlines() == CAT_LINES
+    assert "'uchr search -d' is deprecated" in captured.err
 
 
 def test_name_search_also_matches_cjk_meanings(capsys):
