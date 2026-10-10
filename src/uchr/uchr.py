@@ -137,6 +137,13 @@ def db_list_command(args):
     return list_versions()
 
 
+def db_blocks_command(args):
+    """Handle uchr db blocks subcommand"""
+    from .database import list_blocks
+
+    return list_blocks(version=args.version)
+
+
 def db_delete_command(args):
     """Handle uchr db delete subcommand"""
     from .database import delete_version
@@ -168,6 +175,7 @@ Examples:
   uchr db update --version 16.0.0     # Fetch a specific version
   uchr db use 16.0.0                  # Switch current version
   uchr db list                        # List available/local versions
+  uchr db blocks                      # List block names for search -b
   uchr db delete 16.0.0               # Delete one version's data
         """,
     )
@@ -187,7 +195,7 @@ Examples:
         action="store_const",
         dest="by",
         const="block",
-        help="Search by block name",
+        help="Search by block name (list them with 'uchr db blocks')",
     )
     search_by_group.add_argument(
         "-c",
@@ -318,6 +326,18 @@ Examples:
         "list", help="List published and locally stored Unicode versions"
     )
     db_list_parser.set_defaults(func=db_list_command)
+
+    # db blocks
+    db_blocks_parser = db_subparsers.add_parser(
+        "blocks", help="List the block names that search -b matches"
+    )
+    db_blocks_parser.add_argument(
+        "--version",
+        default=None,
+        metavar="X.Y.Z",
+        help="Version to list (default: current)",
+    )
+    db_blocks_parser.set_defaults(func=db_blocks_command)
 
     # db delete
     db_delete_parser = db_subparsers.add_parser(
