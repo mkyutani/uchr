@@ -495,3 +495,22 @@ def list_versions():
         print(f"{version}{marker_text}{suffix}")
 
     return 0
+
+
+def list_blocks(version=None):
+    """Print the block names of `version` (default: current) that
+    `search -b` matches, one per line. Emoji sequences are listed by
+    their type, such as RGI_Emoji_ZWJ_Sequence."""
+    version, error = resolve_search_version(version)
+    if error:
+        print(error, file=sys.stderr)
+        return 1
+    with Connection() as conn:
+        rows = conn.execute(
+            "select distinct block from char where version = ? "
+            "order by block collate nocase",
+            (version,),
+        ).fetchall()
+    for (block,) in rows:
+        print(block)
+    return 0

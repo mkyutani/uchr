@@ -224,6 +224,37 @@ def test_search_filters_by_version(fake_network, capsys):
     assert capsys.readouterr().out.count("grinning face") == 2
 
 
+def test_blocks_lists_block_names_of_version(fake_network, capsys):
+    database.update_database(version="17.0.0")
+    capsys.readouterr()
+
+    assert database.list_blocks() == 0
+    # Emoji sequences are listed by their type.
+    assert capsys.readouterr().out.splitlines() == [
+        "ASCII",
+        "Basic_Emoji",
+        "Emoji_Keycap_Sequence",
+        "Misc_Pictographs",
+        "RGI_Emoji_ZWJ_Sequence",
+    ]
+
+    assert database.list_blocks("16.0.0") == 1
+    assert "db update --version 16.0.0" in capsys.readouterr().err
+
+
+def test_db_blocks_version_option(monkeypatch):
+    calls = []
+
+    def fake_list_blocks(version=None):
+        calls.append(version)
+        return 0
+
+    monkeypatch.setattr(database, "list_blocks", fake_list_blocks)
+    args = create_parser().parse_args(["db", "blocks", "--version", "16.0.0"])
+    assert args.func(args) == 0
+    assert calls == ["16.0.0"]
+
+
 def test_resolve_search_version(fake_network):
     # First run without a DB fetches latest.
     assert database.resolve_search_version(None) == ("17.0.0", None)

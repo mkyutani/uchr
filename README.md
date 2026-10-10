@@ -195,6 +195,25 @@ uchr search -c 17000
 uchr search -b "Misc_Pictographs"
 ```
 
+`-b` matches part of a block name, as the UCD abbreviates it
+(`Misc_Pictographs`, not *Miscellaneous Symbols and Pictographs*).
+`uchr db blocks` lists the names, and emoji sequences by their type,
+such as `RGI_Emoji_ZWJ_Sequence`:
+
+```bash
+uchr db blocks | grep -i arabic
+```
+```
+Arabic
+Arabic_Ext_A
+Arabic_Ext_B
+Arabic_Ext_C
+Arabic_Math
+Arabic_PF_A
+Arabic_PF_B
+Arabic_Sup
+```
+
 ### Search Without Related Emoji
 
 ```bash
@@ -238,7 +257,7 @@ Search Unicode characters with various criteria.
 | (none) | | Search names and CJK meanings for whole words, plus related emoji (default) |
 | `--code` | `-c` | Search by code point or range |
 | `--char` | `-x` | Search by character |
-| `--block` | `-b` | Search by Unicode block |
+| `--block` | `-b` | Search by Unicode block (names: `uchr db blocks`) |
 | `--detail` | `-d` | Search names and CJK meanings for whole words, without related emoji |
 | `--strict` | `-s` | Exact match (case insensitive), without related emoji |
 | `--threshold` | `-t` | How close a related emoji must be: `loose`, `normal` (default), `close`, a minimum similarity in (0, 1], or `strict` (same as `-s`) |
@@ -271,6 +290,7 @@ the database at once; `current_version` (set by `update`/`use`) is what
 | `uchr db update [--version X.Y.Z] [--verbose]` | Fetch a version (default: latest from unicode.org) and switch to it; `--verbose` lists every skipped code point |
 | `uchr db use <version>` | Switch to a version already stored locally, without downloading |
 | `uchr db list` | List every version unicode.org currently publishes, marking which are stored locally, current, latest, or draft |
+| `uchr db blocks [--version X.Y.Z]` | List the block names of the current (or given) version that `search -b` matches |
 | `uchr db delete <version>` | Delete one version's data |
 | `uchr db delete --all` | Delete the entire database file |
 
