@@ -99,19 +99,19 @@ uchr search cat
 猫 732B CAT
 貓 8C93 CAT
 🐈 1F408 CAT
-😾 1F63E POUTING CAT FACE
-🐯 1F42F TIGER FACE
-...
 鯴 9BF4 CAT FISH
 鲺 9CBA CAT FISH
 🐱 1F431 CAT FACE
-🐅 1F405 TIGER
-...
-猞 731E A WILD CAT; 猞猁, A LYNX
+🐈‍⬛ 1F408 200D 2B1B black cat
 ...
 챁 CC41 HANGUL SYLLABLE CAT
-𐇬 101EC PHAISTOS DISC SIGN CAT
+猞 731E A WILD CAT; 猞猁, A LYNX
+...
+😻 1F63B SMILING CAT FACE WITH HEART-SHAPED EYES
 㣇 38C7 A KIND OF BEAST WITH LONG HAIR, OTHER NAME FOR PIG, FOX, WILD CAT, RACCOON
+🐯 1F42F TIGER FACE
+🐅 1F405 TIGER
+🐆 1F406 LEOPARD
 ```
 
 The expression must match **whole words**, of the character name or, for
@@ -121,20 +121,22 @@ CAT*, but not *INDICATOR* or *CATTLE*. Search also lists **related
 emoji**, whose [CLDR keywords](#-data-sources) overlap with those of the
 emoji the expression names (🐯 shares *animal* and *cat* with 🐈).
 
-All results are ranked together by a score from 0 to 1, ties in code order:
+Word matches come first, closest first, then related emoji, most
+similar first; ties go in code order:
 
-- **Word matches** score by the share of the meaning (split into items
-  at `;` and `,`) or else of the name that the expression takes up. An
-  item counts half as much as the one before it, so 鬼 (*GHOST; SPIRIT OF
-  DEAD; …*) scores 1 while 孽 (*EVIL; SON OF CONCUBINE; GHOST*) scores
-  less. A partial match is lifted by 1 − (1 − score)², close to doubling
-  it while an exact match stays at 1: 猫 (*CAT*) scores 1, 鯴 (*CAT
-  FISH*) 0.61, 㣇 (*…, WILD CAT, RACCOON*) 0.09.
-- **Related emoji** score by their cosine similarity of keywords, with
+- **Word matches** rank by the item with the fewest words that matches,
+  splitting the meaning, or else the name, into items at `;`, then by the
+  length of the whole. So *CAT* alone comes first, then texts with an
+  item that is *CAT* itself (䰢 *GHOST; A STAR* after 👻 *GHOST*), then
+  *CAT FISH* or *BLACK CAT*, then longer ones, down to 㣇 (*A KIND OF
+  BEAST WITH LONG HAIR, …, WILD CAT, RACCOON*). Notes like *(SAME AS 魊)*
+  are left out.
+- **Related emoji** rank by their cosine similarity of keywords, with
   keywords that many emoji share (like *face*) counting for little; 🐯
-  scores 0.64. An emoji that is both takes the higher score. The
-  threshold (`-t`) only drops related emoji that do not match by word,
-  so it never changes the order of the rest.
+  scores 0.64. An emoji that also matches by word, such as 😹 (*CAT FACE
+  WITH TEARS OF JOY*), stays with the word matches. The threshold (`-t`)
+  only adds or drops related emoji at the end, so it never changes the
+  order of the rest.
 
 `-t` sets how close a related emoji must be, from widest to narrowest:
 `loose` (similarity 0.2 or more), `normal` (0.3, the default), `close`

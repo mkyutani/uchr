@@ -17,8 +17,11 @@ UCD_XML = b"""<?xml version="1.0" encoding="UTF-8"?>
     <char cp="4C22" na="CJK UNIFIED IDEOGRAPH-#" kDefinition="ghost; a star" blk="CJK"/>
     <char cp="5B7D" na="CJK UNIFIED IDEOGRAPH-#" kDefinition="evil; son of concubine; ghost" blk="CJK"/>
     <char cp="9B3C" na="CJK UNIFIED IDEOGRAPH-#" kDefinition="ghost; spirit of dead; devil" blk="CJK"/>
+    <char cp="4C2C" na="CJK UNIFIED IDEOGRAPH-#" kDefinition="wild ghost; ghost without head; a demon" blk="CJK"/>
+    <char cp="2EE4" na="CJK RADICAL GHOST" blk="CJK_Radicals_Sup"/>
     <char first-cp="17000" last-cp="17001" na="TANGUT IDEOGRAPH-#" blk="Tangut"/>
     <char cp="1F408" na="CAT" blk="Misc_Pictographs"/>
+    <char cp="1F47B" na="GHOST" blk="Misc_Pictographs"/>
   </repertoire>
 </ucd>
 """
@@ -41,9 +44,10 @@ def detail_lines(capsys, fragment, **kwargs):
     return capsys.readouterr().out.splitlines()
 
 
-# Whole words only (not INDICATOR or CATFISH), best match first: the
-# share of a meaning item, or else the name, that the matches take up.
-# CJK ideographs show their meaning instead of the name.
+# Whole words only (not INDICATOR or CATFISH), closest first: the fewest
+# words in a ";" item of the meaning, or else the name, that matches,
+# then the shortest text. CJK ideographs show their meaning instead of
+# the name.
 CAT_LINES = [
     "猫 732B CAT",
     "🐈 1F408 CAT",
@@ -68,13 +72,16 @@ def test_detail_search_matches_phrases(capsys):
     ]
 
 
-def test_earlier_meaning_items_count_more(capsys):
-    # GHOST as the first item scores 1 even with more items after it; as
-    # the third item it counts a quarter (lifted to 0.44).
+def test_items_with_fewer_words_rank_first(capsys):
+    # GHOST alone first, then texts with an item that is GHOST itself,
+    # shorter first wherever the item is, then items with more words.
     assert detail_lines(capsys, "ghost") == [
+        "👻 1F47B GHOST",
         "䰢 4C22 GHOST; A STAR",
         "鬼 9B3C GHOST; SPIRIT OF DEAD; DEVIL",
         "孽 5B7D EVIL; SON OF CONCUBINE; GHOST",
+        "䰬 4C2C WILD GHOST; GHOST WITHOUT HEAD; A DEMON",
+        "⻤ 2EE4 CJK RADICAL GHOST",
     ]
 
 

@@ -23,40 +23,28 @@ def whole_words(fragment):
 _NOTE = re.compile(r"\([^)]*\)")
 
 
-def word_score(pattern, text, name):
-    """How well the whole-word matches of `pattern` fit a character, 0-1.
+def word_rank(pattern, text, name):
+    """Sort key for how closely the whole-word matches of `pattern` fit a
+    character, closest first, or None if nothing matches.
 
     `text` is the name or, for a CJK ideograph, the name, "; " and its
     meaning (kDefinition); the meaning is what counts when it matches.
-    Each item of it (split at ";" and ",") scores the share of it that the
-    matches take up, halved for every item before it: 1 for 猫 (CAT) and
-    鬼 (GHOST; SPIRIT OF DEAD; ...), 0.05 for 㣇 (A KIND OF BEAST WITH LONG
-    HAIR, OTHER NAME FOR PIG, FOX, WILD CAT, RACCOON). The best item is
-    lifted by 1 - (1 - w)^2, nearly doubling a partial match so it can
-    compete with the CLDR similarity of related emoji, while 1 stays 1.
+    Of its items (split at ";", notes like "(SAME AS 雪)" left out), the
+    one with the fewest words that matches counts, then the length of
+    the whole: CAT, then GHOST; A STAR, then CAT FISH, then longer ones.
     """
     meaning = text[len(name) + 2 :]
-    w = (
-        _item_score(pattern, meaning)
-        or _item_score(pattern, text)
-        or _share(pattern, text)
-    )
-    return 1 - (1 - w) ** 2
-
-
-def _item_score(pattern, text):
-    return max(
-        (
-            _share(pattern, _NOTE.sub("", item).strip()) * 0.5**i
-            for i, item in enumerate(re.split("[;,]", text))
-        ),
-        default=0,
-    )
-
-
-def _share(pattern, text):
-    matched = sum(len(m.group()) for m in pattern.finditer(text))
-    return matched / len(text) if matched else 0
+    for shown in (meaning, text):
+        words = [
+            len(item.split())
+            for item in _NOTE.sub("", shown).split(";")
+            if pattern.search(item)
+        ]
+        if words:
+            return min(words), len(shown)
+    if pattern.search(text):
+        return len(text.split()), len(text)
+    return None
 
 
 def shown_text(text, name):
@@ -152,27 +140,30 @@ def search(
 
         if by in ("name", "detail") and not strict:
             # LIKE found substrings ("cat" in "INDICATOR"); keep whole
-            # words. Name search adds related emoji, scored by their CLDR
-            # similarity. Best score first, ties in code order.
+            # words, closest first, ties in code order. Name search adds
+            # related emoji after them, most similar first, so -t only
+            # adds or drops results at the end.
             pattern = whole_words(fragment)
-            scores = {}
+            words = []
             for row in char_list:
-                score = word_score(pattern, row[2], row[4])
-                if score:
-                    scores[row[0]] = (score, row)
+                key = word_rank(pattern, row[2], row[4])
+                if key:
+                    words.append((key, row))
+            words.sort(key=lambda w: (w[0], w[1][3] or ""))
+            char_list = [row for _key, row in words]
             if by == "name":
-                # The threshold decides which emoji to add, not how word
-                # matches rank: a word match takes its similarity when
-                # higher, whatever the threshold.
-                matched = [row for _score, row in scores.values()]
-                for score, row in related_emoji(conn, fragment, matched, version):
-                    if row[0] not in scores:
-                        if score >= threshold:
-                            scores[row[0]] = (score, row)
-                    elif score > scores[row[0]][0]:
-                        scores[row[0]] = (score, row)
-            ranked = sorted(scores.values(), key=lambda s: (-s[0], s[1][3] or ""))
-            char_list = [row for _score, row in ranked]
+                matched = {row[0] for row in char_list}
+                related = sorted(
+                    (
+                        (score, row)
+                        for score, row in related_emoji(
+                            conn, fragment, char_list, version
+                        )
+                        if row[0] not in matched and score >= threshold
+                    ),
+                    key=lambda r: (-r[0], r[1][3] or ""),
+                )
+                char_list += [row for _score, row in related]
 
         if first:
             char_list = char_list[0:1]
